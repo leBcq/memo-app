@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #09090b;
+  --foreground: #f4f4f5;
+
+  /* Appearance settings – overridden at runtime by SettingsContext */
+  --editor-font-size: 14px;
+  --editor-font-family: var(--font-geist-mono), "Courier New", monospace;
+  --editor-max-width: 56rem;
 }
 
 @theme inline {
@@ -12,15 +17,17 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+*::selection {
+  background: rgba(34, 211, 238, 0.28);
+}
+
+[contenteditable]:focus {
+  outline: none;
+  background: transparent !important;
 }

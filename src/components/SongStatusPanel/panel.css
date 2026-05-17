@@ -1,0 +1,73 @@
+.sp-frame {
+  position: relative;
+  background: #0a0a0c;
+  border: 0.5px solid #1e1e24;
+  border-bottom: none;
+}
+
+.sp-corner {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+}
+.sp-corner-tl {
+  top: -0.5px;
+  left: -0.5px;
+  border-top: 1.5px solid #11ddff;
+  border-left: 1.5px solid #11ddff;
+}
+.sp-corner-tr {
+  top: -0.5px;
+  right: -0.5px;
+  border-top: 1.5px solid #11ddff;
+  border-right: 1.5px solid #11ddff;
+}
+.sp-corner-bl {
+  bottom: -0.5px;
+  left: -0.5px;
+  border-bottom: 1.5px solid #11ddff;
+  border-left: 1.5px solid #11ddff;
+}
+.sp-corner-br {
+  bottom: -0.5px;
+  right: -0.5px;
+  border-bottom: 1.5px solid #11ddff;
+  border-right: 1.5px solid #11ddff;
+}
+
+.sp-stage-diamond {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+.sp-sys-diamond {
+  width: 5px;
+  height: 5px;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  background: #11ddff;
+  flex-shrink: 0;
+}
+
+.sp-badge {
+  clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+}
+
+.sp-bpm-edit:focus {
+  outline: none;
+  color: #11ddff;
+}
+
+.sp-root-active {
+  border-color: #11ddff !important;
+  color: #11ddff !important;
+  background: #061212 !important;
+}
+
+.sp-pipe-line {
+  flex: 1;
+  height: 0.5px;
+  background: #1a1a20;
+  margin: 0 2px;
+  margin-bottom: 14px;
+  transition: background 0.2s;
+}

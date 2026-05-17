@@ -1,65 +1,1022 @@
-import Image from "next/image";
+"use client";
+
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import CommandPalette, { type CommandPick } from "@/components/CommandPalette";
+import NodeList from "@/components/Editor/NodeList";
+import Toolbar from "@/components/Editor/Toolbar";
+import { FileSidebar } from "@/components/FileSidebar";
+import { SettingsModal } from "@/components/SettingsModal";
+import { TrackStatusBar } from "@/components/TrackStatusBar";
+import { GamedevToolbarStrip } from "@/components/GamedevToolbarStrip";
+import { CloudSyncIndicator } from "@/components/CloudSyncIndicator";
+import { useMemos } from "@/hooks/useMemos";
+import { matchesKeybind } from "@/config/keybinds";
+import { useSettings } from "@/contexts/SettingsContext";
+import { findNodePath } from "@/lib/treeUtils";
+import { cn } from "@/lib/utils";
+import {
+  getMemoThemeColor,
+  fileItemColorThemeChromeAlphaMultiplier,
+  isColorFullyTransparent,
+  EDITOR_STANDARD_TEXT_COLOR,
+  EDITOR_STANDARD_CARET_COLOR,
+} from "@/lib/memoThemeColor";
+import { PanelLeft, PanelLeftClose } from "lucide-react";
+import type { MemoType } from "@/types/memoKind";
+import type { HeadingLevel, NoteNode } from "@/types/note";
+import type { MessageId } from "@/i18n/messages";
+import { useTranslation } from "@/i18n/useTranslation";
+
+// ─── Node tree helpers ────────────────────────────────────────────────────────
+
+/** Find a single node by ID anywhere in the tree. */
+function findNodeById(nodes: NoteNode[], id: string): NoteNode | null {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    const found = findNodeById(node.children, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+function crumbLabelRich(node: NoteNode, t: (id: MessageId) => string): React.ReactNode {
+  if (node.pluginData) {
+    const n = node.pluginData.name.trim();
+    return n ? n : <span className="italic text-zinc-600">{t("crumb.pluginFallback")}</span>;
+  }
+  if (node.gameData) {
+    const n = node.gameData.name.trim();
+    return n ? n : <span className="italic text-zinc-600">{t("crumb.specFallback")}</span>;
+  }
+  if (node.content) {
+    return <span dangerouslySetInnerHTML={{ __html: node.content }} />;
+  }
+  return <span className="italic text-zinc-600">{t("sidebar.untitledMemo")}</span>;
+}
+
+/** Strip HTML tags to get plain text. */
+function htmlToPlainText(html: string): string {
+  if (typeof document === "undefined") return html.replace(/<[^>]+>/g, "");
+  const el = document.createElement("div");
+  el.innerHTML = html;
+  return el.textContent ?? "";
+}
+
+/** Collect text from selected nodes preserving indent depth. */
+function collectSelectedText(nodes: NoteNode[], selected: Set<string>, depth = 0): string {
+  const lines: string[] = [];
+  for (const node of nodes) {
+    if (selected.has(node.id)) {
+      const line = node.pluginData
+        ? [node.pluginData.name, node.pluginData.category, node.pluginData.purpose].filter(Boolean).join(" · ")
+        : node.gameData
+          ? [node.gameData.name, node.gameData.category, node.gameData.stats].filter(Boolean).join(" · ")
+          : htmlToPlainText(node.content);
+      lines.push("\t".repeat(depth) + line);
+    }
+    const childLines = collectSelectedText(node.children, selected, depth + 1);
+    if (childLines) lines.push(childLines);
+  }
+  return lines.join("\n");
+}
+
+/** All note block roots in visual DOM order (one entry per node). */
+function getDomOrderedNodeIds(): string[] {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>('[data-geo-block="note-node"]'),
+  ).map((el) => el.getAttribute("data-node-id") ?? "").filter(Boolean);
+}
+
+function intersects(a: DOMRect, b: { left: number; top: number; right: number; bottom: number }): boolean {
+  return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+}
+
+const SIDEBAR_WIDTH_KEY = "geo-memo:sidebar-width";
+const SIDEBAR_OPEN_KEY = "geo-memo:sidebar-open";
+const SIDEBAR_MIN = 160;
+const SIDEBAR_MAX = 600;
+const SIDEBAR_DEFAULT = 208; // ≈ w-52
+
+/** When true, let the browser handle Ctrl/Cmd+Z so field text undo is not swallowed. */
+function shouldDeferGlobalUndoToNative(): boolean {
+  const el = document.activeElement;
+  if (!el) return false;
+  if (el instanceof HTMLInputElement) {
+    const nativeTypes = new Set([
+      "button",
+      "submit",
+      "reset",
+      "checkbox",
+      "radio",
+      "file",
+      "range",
+      "color",
+    ]);
+    if (nativeTypes.has(el.type)) return false;
+    return true;
+  }
+  if (el instanceof HTMLTextAreaElement) return true;
+  if (el instanceof HTMLSelectElement) return true;
+  if (el instanceof HTMLElement && el.isContentEditable) return true;
+  return false;
+}
 
 export default function Home() {
+  const { t } = useTranslation();
+  const crumbLabel = useCallback((node: NoteNode) => crumbLabelRich(node, t), [t]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const activeEditorRef = useRef<HTMLDivElement | null>(null);
+  const titleRef = useRef<HTMLInputElement | null>(null);
+  const memoWorkspaceRef = useRef<HTMLDivElement | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // ── Focus (zoom) mode ───────────────────────────────────────────────────────
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
+  const focusedHeaderRef = useRef<HTMLDivElement>(null);
+  const { settings } = useSettings();
+
+  // ── Multi-node block selection (explicit state; not browser text selection) ──
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const isDragSelectRef = useRef(false);
+  /** Anchor for Shift+click range and drag-to-select */
+  const selectionAnchorRef = useRef<string | null>(null);
+  const isMarqueeRef = useRef(false);
+  const marqueeOriginRef = useRef({ x: 0, y: 0 });
+  const [marqueeRect, setMarqueeRect] = useState<{
+    left: number; top: number; width: number; height: number;
+  } | null>(null);
+
+  /** True while Alt is held: block-selection UX + editors locked */
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const isSelectionModeRef = useRef(false);
+
+  // ── Sidebar resize ──────────────────────────────────────────────────────────
+  // Always start with default to avoid SSR/hydration mismatch, then restore
+  // from localStorage synchronously before first paint via useLayoutEffect.
+  const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_DEFAULT);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const isResizingRef = useRef(false);
+  const resizeStartXRef = useRef(0);
+  const resizeStartWRef = useRef(0);
+
+  useLayoutEffect(() => {
+    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    const parsed = saved ? parseInt(saved, 10) : NaN;
+    if (!isNaN(parsed)) {
+      setSidebarWidth(Math.min(Math.max(parsed, SIDEBAR_MIN), SIDEBAR_MAX));
+    }
+    const openRaw = localStorage.getItem(SIDEBAR_OPEN_KEY);
+    if (openRaw === "0") setIsSidebarOpen(false);
+  }, []);
+
+  useEffect(() => {
+    const onMouseMove = (e: globalThis.MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const delta = e.clientX - resizeStartXRef.current;
+      const next = Math.min(Math.max(resizeStartWRef.current + delta, SIDEBAR_MIN), SIDEBAR_MAX);
+      setSidebarWidth(next);
+    };
+    const onMouseUp = () => {
+      if (!isResizingRef.current) return;
+      isResizingRef.current = false;
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      setSidebarWidth((w) => {
+        localStorage.setItem(SIDEBAR_WIDTH_KEY, String(w));
+        return w;
+      });
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
+  const {
+    memos,
+    activeMemoId,
+    activeMemo,
+    switchMemo,
+    addMemo,
+    setMemoType,
+    patchActiveMusicMeta,
+    updateMemoTitle,
+    fileItems,
+    addFolder,
+    toggleFolder,
+    expandFoldersToRevealItem,
+    ensureFolderOpen,
+    expandNodePathInMemo,
+    renameItem,
+    deleteFileItem,
+    moveItem,
+    duplicateMemo,
+    toggleBookmark,
+    setItemIcon,
+    setItemColor,
+    exportMemo,
+    exportFullBackup,
+    canUndo,
+    canRedo,
+    undo,
+    redo,
+    beginMemoTextUndoSession,
+    endMemoTextUndoSession,
+    beginMemoColorSliderUndoGesture,
+    endMemoColorSliderUndoGesture,
+    nodes,
+    setNodeContent,
+    setNodeImageUrl,
+    toggleCollapsed,
+    addChild,
+    addSibling,
+    addRootNode,
+    removeNode,
+    deleteNodeAndFocusPrev,
+    handleIndent,
+    handleUnindent,
+    handleBulkIndent,
+    handleBulkUnindent,
+    toggleCompleted,
+    toggleHasCheckbox,
+    toggleNote,
+    setNote,
+    setNodeBgColor,
+    setNodesBgColorBatch,
+    setNodeHeading,
+    setNodesHeadingBatch,
+    patchActiveNodeContents,
+    insertElectronicSongStructure,
+    addPluginSibling,
+    addGameSpecSibling,
+    convertNodeToPluginCard,
+    convertNodeToGameSpecCard,
+    patchNodePluginData,
+    patchNodeGameData,
+    setMemoWorkflowStatus,
+    patchActiveGamedevMeta,
+    cloudSync,
+  } = useMemos();
+
+  const handleSetBgColor = useCallback(
+    (id: string, color: string | null, opts?: { skipHistory?: boolean }) => {
+      if (selectedIds.length >= 2) {
+        setNodesBgColorBatch(selectedIds, color, opts);
+      } else {
+        setNodeBgColor(id, color, opts);
+      }
+    },
+    [selectedIds, setNodesBgColorBatch, setNodeBgColor],
+  );
+
+  const handleSetHeading = useCallback(
+    (id: string, level: HeadingLevel) => {
+      if (selectedIds.length >= 2) {
+        setNodesHeadingBatch(selectedIds, level);
+      } else {
+        setNodeHeading(id, level);
+      }
+    },
+    [selectedIds, setNodesHeadingBatch, setNodeHeading],
+  );
+
+  const handleAddMemo = (parentId: string | null = null, kind: MemoType = "standard") => {
+    addMemo(parentId, kind);
+    requestAnimationFrame(() => titleRef.current?.focus());
+  };
+
+  // ── Focus mode helpers ────────────────────────────────────────────────────
+  const focusedPath = useMemo(
+    () => (focusedNodeId ? findNodePath(nodes, focusedNodeId) : null),
+    [nodes, focusedNodeId],
+  );
+
+  const displayNodes = useMemo<NoteNode[]>(() => {
+    if (!focusedNodeId) return nodes;
+    const target = findNodeById(nodes, focusedNodeId);
+    return target ? target.children : nodes;
+  }, [nodes, focusedNodeId]);
+
+  const focusedNodeSnapshot = useMemo(
+    () => (focusedNodeId ? findNodeById(nodes, focusedNodeId) : null),
+    [nodes, focusedNodeId],
+  );
+
+  const activeMemoFileItem = useMemo(
+    () => fileItems.find((i) => i.id === activeMemoId && i.type === "memo") ?? null,
+    [fileItems, activeMemoId],
+  );
+  const memoWorkflowStatus = activeMemoFileItem?.workflowStatus ?? "DRAFT";
+
+  const memoThemeColor = useMemo(() => getMemoThemeColor(activeMemo), [activeMemo]);
+
+  const themeChromeAlphaMult = useMemo(() => {
+    const fromFile = fileItemColorThemeChromeAlphaMultiplier(activeMemoFileItem?.color);
+    const tc = activeMemo.themeColor;
+    if (typeof tc === "string" && isColorFullyTransparent(tc)) return 0;
+    return fromFile;
+  }, [activeMemoFileItem?.color, activeMemo.themeColor]);
+
+  const handleFocusNode = useCallback((id: string) => {
+    const target = findNodeById(nodes, id);
+    if (target && target.children.length === 0) {
+      addChild(id); // auto-create one child so the list is never empty
+    }
+    setFocusedNodeId(id);
+  }, [nodes, addChild]);
+
+  const handleUnfocus = useCallback((toId: string | null = null) => {
+    setFocusedNodeId(toId);
+  }, []);
+
+  const handleCommandPick = useCallback(
+    (pick: CommandPick) => {
+      if (pick.kind === "folder") {
+        expandFoldersToRevealItem(pick.folderId);
+        ensureFolderOpen(pick.folderId);
+        return;
+      }
+      expandFoldersToRevealItem(pick.memoId);
+      switchMemo(pick.memoId);
+      setFocusedNodeId(null);
+      setSelectedIds([]);
+      selectionAnchorRef.current = null;
+      if (pick.kind === "node") {
+        expandNodePathInMemo(pick.memoId, pick.nodeId);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const el = document.querySelector<HTMLElement>(
+              `[data-node-id="${pick.nodeId}"] [data-geo-editor="body"]`,
+            );
+            if (!el) return;
+            el.scrollIntoView({ block: "center", behavior: "smooth" });
+            el.focus();
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            range.collapse(false);
+            window.getSelection()?.removeAllRanges();
+            window.getSelection()?.addRange(range);
+          });
+        });
+      }
+    },
+    [
+      expandFoldersToRevealItem,
+      ensureFolderOpen,
+      switchMemo,
+      expandNodePathInMemo,
+    ],
+  );
+
+  // Reset focus when memo changes
+  useEffect(() => { setFocusedNodeId(null); }, [activeMemoId]);
+  useEffect(() => { setSelectedIds([]); selectionAnchorRef.current = null; }, [activeMemoId]);
+
+  // Sync focused-node header contenteditable when the focused node changes
+  useLayoutEffect(() => {
+    if (!focusedHeaderRef.current || !focusedNodeId) return;
+    const node = findNodeById(nodes, focusedNodeId);
+    if (!node || node.pluginData || node.gameData) return;
+    focusedHeaderRef.current.innerHTML = node.content || "";
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedNodeId]); // intentionally NOT re-syncing on content change to keep cursor
+
+  // ── Alt = selection mode (release = resume editing; selectedIds may stay) ───
+  useEffect(() => {
+    const clearDragging = () => {
+      isDragSelectRef.current = false;
+      isMarqueeRef.current = false;
+      setMarqueeRect(null);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Alt" || e.repeat) return;
+      isSelectionModeRef.current = true;
+      setIsSelectionMode(true);
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== "Alt") return;
+      isSelectionModeRef.current = false;
+      setIsSelectionMode(false);
+      clearDragging();
+    };
+    const onBlur = () => {
+      isSelectionModeRef.current = false;
+      setIsSelectionMode(false);
+      clearDragging();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []);
+
+  // ── Global search palette (Ctrl/Cmd + P) ───────────────────────────────────
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "p") {
+        e.preventDefault();
+        setCommandPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // ── Global keyboard shortcuts (Undo/Redo + Focus) ─────────────────────────
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      // Undo/Redo (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z)
+      const meta = e.ctrlKey || e.metaKey;
+      if (meta) {
+        const key = e.key.toLowerCase();
+        const undoRedo = key === "y" || (key === "z" && e.shiftKey) ? "redo" : key === "z" && !e.shiftKey ? "undo" : null;
+        if (undoRedo) {
+          if (shouldDeferGlobalUndoToNative()) return;
+          e.preventDefault();
+          if (undoRedo === "undo") undo();
+          else redo();
+          return;
+        }
+      }
+
+      // Focus mode (Alt+→ / Alt+←)
+      if (matchesKeybind(e, settings.keymap.FOCUS_NODE)) {
+        e.preventDefault();
+        if (activeId) handleFocusNode(activeId);
+        return;
+      }
+      if (matchesKeybind(e, settings.keymap.UNFOCUS_NODE)) {
+        e.preventDefault();
+        if (focusedPath && focusedPath.length > 1) {
+          // Go up one level
+          handleUnfocus(focusedPath[focusedPath.length - 2].id);
+        } else {
+          handleUnfocus(null);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [undo, redo, activeId, focusedPath, handleFocusNode, handleUnfocus, settings.keymap]);
+
+  // Commit rich-text / title edits to the global undo stack when focus leaves the memo workspace.
+  useEffect(() => {
+    const el = memoWorkspaceRef.current;
+    if (!el) return;
+    const onFocusIn = (ev: FocusEvent) => {
+      const t = ev.target;
+      if (
+        t instanceof HTMLInputElement ||
+        t instanceof HTMLTextAreaElement ||
+        t instanceof HTMLSelectElement
+      ) {
+        beginMemoTextUndoSession();
+        return;
+      }
+      if (t instanceof HTMLElement && t.isContentEditable) beginMemoTextUndoSession();
+    };
+    const onFocusOut = () => {
+      window.setTimeout(() => {
+        const ae = document.activeElement;
+        if (ae && el.contains(ae)) return;
+        endMemoTextUndoSession();
+      }, 0);
+    };
+    el.addEventListener("focusin", onFocusIn);
+    el.addEventListener("focusout", onFocusOut);
+    return () => {
+      el.removeEventListener("focusin", onFocusIn);
+      el.removeEventListener("focusout", onFocusOut);
+    };
+  }, [beginMemoTextUndoSession, endMemoTextUndoSession, activeMemoId]);
+
+  // ── Block selection: Alt+Shift+click / Alt+drag / Alt+marquee ( editors locked while Alt held )
+  const handleBlockSelectMouseDown = useCallback((id: string, e: React.MouseEvent) => {
+    if (!e.altKey) return;
+
+    if (e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      const anchor = selectionAnchorRef.current ?? selectedIds[0] ?? id;
+      const ids = getDomOrderedNodeIds();
+      const aIdx = ids.indexOf(anchor);
+      const bIdx = ids.indexOf(id);
+      if (aIdx !== -1 && bIdx !== -1) {
+        const [lo, hi] = aIdx <= bIdx ? [aIdx, bIdx] : [bIdx, aIdx];
+        const next = ids.slice(lo, hi + 1);
+        setSelectedIds(next);
+        selectionAnchorRef.current = anchor;
+      } else {
+        setSelectedIds([id]);
+        selectionAnchorRef.current = id;
+      }
+      isDragSelectRef.current = false;
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedIds([id]);
+    selectionAnchorRef.current = id;
+    isDragSelectRef.current = true;
+  }, [selectedIds]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (selectedIds.length === 0 || commandPaletteOpen || settingsOpen) return;
+      if (!matchesKeybind(e, settings.keymap.INDENT) && !matchesKeybind(e, settings.keymap.UNINDENT)) {
+        return;
+      }
+
+      const ae = document.activeElement as HTMLElement | null;
+      if (ae?.closest("[data-geo-editor-toolbar]")) return;
+      if (ae?.closest("aside")) return;
+      if (ae?.closest("[data-geo-mode-strip]")) return;
+      if (ae?.closest('[role="dialog"]')) return;
+      if (ae instanceof HTMLInputElement || ae instanceof HTMLTextAreaElement || ae instanceof HTMLSelectElement) {
+        return;
+      }
+      if (ae?.closest('[data-geo-editor="focus-title"]')) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      if (matchesKeybind(e, settings.keymap.UNINDENT)) {
+        handleBulkUnindent(selectedIds);
+      } else {
+        handleBulkIndent(selectedIds);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [
+    selectedIds,
+    settings.keymap,
+    handleBulkIndent,
+    handleBulkUnindent,
+    commandPaletteOpen,
+    settingsOpen,
+  ]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!e.altKey) {
+        if (isMarqueeRef.current || isDragSelectRef.current) {
+          isMarqueeRef.current = false;
+          isDragSelectRef.current = false;
+          setMarqueeRect(null);
+        }
+        return;
+      }
+      if (isMarqueeRef.current) {
+        const { x, y } = marqueeOriginRef.current;
+        setMarqueeRect({
+          left: Math.min(x, e.clientX),
+          top: Math.min(y, e.clientY),
+          width: Math.abs(e.clientX - x),
+          height: Math.abs(e.clientY - y),
+        });
+        return;
+      }
+      if (!isDragSelectRef.current || !selectionAnchorRef.current) return;
+      const els = document.elementsFromPoint(e.clientX, e.clientY);
+      const nodeEl = els.find(
+        (el) =>
+          el instanceof HTMLElement &&
+          el.getAttribute("data-geo-block") === "note-node",
+      ) as HTMLElement | undefined;
+      if (!nodeEl) return;
+      const hoverId = nodeEl.getAttribute("data-node-id") ?? "";
+      if (!hoverId) return;
+      const ids = getDomOrderedNodeIds();
+      const aIdx = ids.indexOf(selectionAnchorRef.current);
+      const bIdx = ids.indexOf(hoverId);
+      if (aIdx === -1 || bIdx === -1) return;
+      const [lo, hi] = aIdx <= bIdx ? [aIdx, bIdx] : [bIdx, aIdx];
+      setSelectedIds(ids.slice(lo, hi + 1));
+    };
+
+    const onUp = (e: MouseEvent) => {
+      if (isMarqueeRef.current) {
+        const { x, y } = marqueeOriginRef.current;
+        const left = Math.min(x, e.clientX);
+        const top = Math.min(y, e.clientY);
+        const right = Math.max(x, e.clientX);
+        const bottom = Math.max(y, e.clientY);
+        const w = right - left;
+        const h = bottom - top;
+        isMarqueeRef.current = false;
+        setMarqueeRect(null);
+        if (w < 4 && h < 4) {
+          setSelectedIds([]);
+          selectionAnchorRef.current = null;
+        } else {
+          const box = { left, top, right, bottom };
+          const hit: string[] = [];
+          document.querySelectorAll<HTMLElement>('[data-geo-block="note-node"]').forEach((el) => {
+            if (intersects(el.getBoundingClientRect(), box)) {
+              const nid = el.getAttribute("data-node-id");
+              if (nid) hit.push(nid);
+            }
+          });
+          setSelectedIds(hit);
+          selectionAnchorRef.current = hit[0] ?? null;
+        }
+        return;
+      }
+      isDragSelectRef.current = false;
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  // ── Copy: hijack when block selection is active (capture phase) ────────────
+  useEffect(() => {
+    const onCopy = (e: ClipboardEvent) => {
+      if (selectedIds.length === 0) return;
+
+      const active = document.activeElement as HTMLElement | null;
+      if (active?.isContentEditable) {
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed && sel.anchorNode && active.contains(sel.anchorNode)) {
+          return;
+        }
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+      const text = collectSelectedText(displayNodes, new Set(selectedIds));
+      e.clipboardData?.setData("text/plain", text);
+    };
+    document.addEventListener("copy", onCopy, true);
+    return () => document.removeEventListener("copy", onCopy, true);
+  }, [selectedIds, displayNodes]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950 text-zinc-100">
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        memos={memos}
+        fileItems={fileItems}
+        onPick={handleCommandPick}
+      />
+
+      {marqueeRect && (marqueeRect.width > 1 || marqueeRect.height > 1) && (
+        <div
+          className="pointer-events-none fixed z-[9998] border border-cyan-400/70 bg-cyan-500/15"
+          style={{
+            left: marqueeRect.left,
+            top: marqueeRect.top,
+            width: marqueeRect.width,
+            height: marqueeRect.height,
+          }}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+      )}
+      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:28px_28px]" />
+      <div className="pointer-events-none fixed -left-8 top-12 h-40 w-40 rotate-45 border border-cyan-400/30" />
+      <div className="pointer-events-none fixed bottom-10 right-12 h-48 w-48 border border-zinc-700/70" />
+
+      <Toolbar
+        isEditorActive={Boolean(activeId)}
+        getActiveEditor={() => activeEditorRef.current}
+        selectedIds={selectedIds}
+        onPatchNodeContents={patchActiveNodeContents}
+        onSyncActiveEditor={() => {
+          if (!activeId || !activeEditorRef.current) return;
+          setNodeContent(activeId, activeEditorRef.current.innerHTML ?? "");
+        }}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
+        memoType={activeMemo.memoType}
+        workflowStatus={memoWorkflowStatus}
+        onWorkflowChange={(s) => setMemoWorkflowStatus(activeMemoId, s)}
+        gamedevStage={
+          activeMemo.memoType === "gamedev" && activeMemo.gamedevMeta
+            ? activeMemo.gamedevMeta.stage
+            : undefined
+        }
+        onGamedevStageChange={
+          activeMemo.memoType === "gamedev"
+            ? (stage) => patchActiveGamedevMeta({ stage })
+            : undefined
+        }
+      />
+
+      <div className="relative flex min-h-0 min-w-0 flex-1">
+        <button
+          type="button"
+          aria-expanded={isSidebarOpen}
+          aria-label={isSidebarOpen ? "サイドバーを閉じる" : "サイドバーを開く"}
+          onClick={() => {
+            setIsSidebarOpen((o) => {
+              const next = !o;
+              localStorage.setItem(SIDEBAR_OPEN_KEY, next ? "1" : "0");
+              return next;
+            });
+          }}
+          className={cn(
+            "absolute top-2 z-30 flex h-8 w-8 items-center justify-center rounded-md border border-zinc-800/80 bg-zinc-950/95 text-zinc-400 shadow-lg shadow-black/30 backdrop-blur-sm transition-[left,transform,colors] duration-300 ease-out hover:border-cyan-500/40 hover:text-cyan-300",
+          )}
+          style={{ left: isSidebarOpen ? sidebarWidth + 6 : 10 }}
+          title={isSidebarOpen ? t("app.sidebarHide") : t("app.sidebarShow")}
+        >
+          {isSidebarOpen ? <PanelLeftClose size={18} strokeWidth={1.75} /> : <PanelLeft size={18} strokeWidth={1.75} />}
+        </button>
+
+        <div
+          className={cn(
+            "flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-zinc-800/40 transition-[width] duration-300 ease-out",
+            isSidebarOpen && "border-r",
+          )}
+          style={{ width: isSidebarOpen ? sidebarWidth : 0 }}
+        >
+          <FileSidebar
+            width={sidebarWidth}
+            fileItems={fileItems}
+            memos={memos}
+            activeMemoId={activeMemoId}
+            onSelectMemo={switchMemo}
+            onAddMemo={handleAddMemo}
+            onSetMemoType={setMemoType}
+            onAddFolder={addFolder}
+            onToggleFolder={toggleFolder}
+            onRenameItem={renameItem}
+            onDeleteItem={deleteFileItem}
+            onMoveItem={moveItem}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onDuplicateMemo={duplicateMemo}
+            onToggleBookmark={toggleBookmark}
+            onSetItemIcon={setItemIcon}
+            onSetItemColor={setItemColor}
+            onExportMemo={exportMemo}
+            onExportFullBackup={exportFullBackup}
+            onMemoColorSliderUndoGestureStart={beginMemoColorSliderUndoGesture}
+            onMemoColorSliderUndoGestureEnd={endMemoColorSliderUndoGesture}
+          />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Resize handle */}
+        <div
+          className={cn(
+            "group relative z-10 flex h-full min-h-0 w-1 shrink-0 cursor-col-resize items-center justify-center transition-all duration-300 ease-out",
+            !isSidebarOpen && "pointer-events-none w-0 max-w-0 opacity-0",
+          )}
+          onMouseDown={(e) => {
+            if (!isSidebarOpen) return;
+            e.preventDefault();
+            isResizingRef.current = true;
+            resizeStartXRef.current = e.clientX;
+            resizeStartWRef.current = sidebarWidth;
+            document.body.style.userSelect = "none";
+            document.body.style.cursor = "col-resize";
+          }}
+        >
+          {/* Visual line — becomes cyan on hover / during drag */}
+          <div className="h-full w-px bg-zinc-800/70 transition-colors group-hover:bg-cyan-500/50" />
         </div>
-      </main>
+
+        {settingsOpen && (
+          <SettingsModal
+            onClose={() => setSettingsOpen(false)}
+            onExportFullBackup={exportFullBackup}
+          />
+        )}
+
+        <div ref={memoWorkspaceRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {/* Mode strip: music tools or gamedev spec tools (fixed h-9). */}
+          <div
+            className={cn(
+              "relative z-30 h-9 shrink-0 overflow-visible transition-[border-color,background-color] duration-300 ease-in-out",
+              (activeMemo.memoType === "music" && activeMemo.musicMeta) || activeMemo.memoType === "gamedev"
+                ? "bg-zinc-950/95"
+                : "border-b border-zinc-800/35 bg-zinc-950",
+            )}
+            data-geo-mode-strip
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {activeMemo.memoType === "music" && activeMemo.musicMeta ? (
+              <TrackStatusBar
+                key={activeMemoId}
+                meta={activeMemo.musicMeta}
+                onPatch={patchActiveMusicMeta}
+                onInsertStructure={() => insertElectronicSongStructure(activeId)}
+                onAddPlugin={() => addPluginSibling(activeId)}
+                themeColor={memoThemeColor}
+                themeChromeAlphaMult={themeChromeAlphaMult}
+                rowTintSourceColor={activeMemoFileItem?.color}
+              />
+            ) : activeMemo.memoType === "gamedev" ? (
+              <GamedevToolbarStrip
+                onAddSpecCard={() => addGameSpecSibling(activeId)}
+                themeColor={memoThemeColor}
+                themeChromeAlphaMult={themeChromeAlphaMult}
+                rowTintSourceColor={activeMemoFileItem?.color}
+              />
+            ) : (
+              <div className="h-9 w-full" aria-hidden />
+            )}
+          </div>
+
+          <div
+            className="min-h-0 flex-1 overflow-y-auto"
+            onMouseDown={(e) => {
+            const t = e.target as HTMLElement;
+            if (t.closest('[data-geo-block="note-node"]')) return;
+            if (t.closest("[data-geo-editor-root]")) return;
+            if (t.closest("[data-geo-node-context-menu]")) return;
+            if (t.closest("[contenteditable]")) return;
+            if (t.closest("button, input, textarea, a")) return;
+            setSelectedIds([]);
+            selectionAnchorRef.current = null;
+          }}
+        >
+          <div key={activeMemoId} className={cn(
+            "mx-auto px-6 pb-12 pt-6",
+            isSelectionMode && "cursor-cell select-none",
+          )} style={{ maxWidth: "var(--editor-max-width)", fontSize: "var(--editor-font-size)", fontFamily: "var(--editor-font-family)" }}>
+
+            {/* ── Breadcrumbs (visible only in focus mode) ── */}
+            {focusedPath && (
+              <div className="mb-4 flex flex-wrap items-center gap-1 font-mono text-[10px] tracking-wide">
+                {/* Memo root crumb */}
+                <button
+                  type="button"
+                  onClick={() => handleUnfocus(null)}
+                  className="text-zinc-500 transition-colors hover:text-cyan-400"
+                >
+                  {activeMemo.title || t("app.memoTitlePlaceholder")}
+                </button>
+
+                {focusedPath.map((crumb, i) => {
+                  const isLast = i === focusedPath.length - 1;
+                  return (
+                    <span key={crumb.id} className="flex items-center gap-1">
+                      <span className="text-zinc-700">›</span>
+                      {isLast ? (
+                        <span className="text-zinc-300">{crumbLabel(crumb)}</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleUnfocus(crumb.id)}
+                          className="max-w-[120px] truncate text-zinc-500 transition-colors hover:text-cyan-400"
+                        >
+                          {crumbLabel(crumb)}
+                        </button>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ── Memo title OR focused-node editable header ── */}
+            {focusedPath ? (
+              <div className="mb-4 border-l-2 border-cyan-500/50 pl-3">
+                {focusedNodeSnapshot?.pluginData ? (
+                  <div className="font-mono text-xl font-medium leading-snug text-violet-200/90">
+                    {focusedNodeSnapshot.pluginData.name.trim() || (
+                      <span className="italic text-zinc-600">{t("app.pluginCardEmpty")}</span>
+                    )}
+                  </div>
+                ) : focusedNodeSnapshot?.gameData ? (
+                  <div className="font-mono text-xl font-medium leading-snug text-amber-200/85">
+                    {focusedNodeSnapshot.gameData.name.trim() || (
+                      <span className="italic text-zinc-600">{t("app.specCardEmpty")}</span>
+                    )}
+                  </div>
+                ) : (
+                <div
+                  ref={focusedHeaderRef}
+                  contentEditable={!isSelectionMode}
+                  suppressContentEditableWarning
+                  data-geo-editor="focus-title"
+                  data-ph={t("app.focusNodeTitlePh")}
+                  className="font-mono text-xl font-medium outline-none empty:before:text-zinc-600 empty:before:italic [&:empty]:before:content-[attr(data-ph)]"
+                  style={{
+                    color: EDITOR_STANDARD_TEXT_COLOR,
+                    caretColor: EDITOR_STANDARD_CARET_COLOR,
+                  }}
+                  onInput={(e) => {
+                    if (focusedNodeId)
+                      setNodeContent(focusedNodeId, (e.currentTarget as HTMLDivElement).innerHTML);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (focusedNodeId) addChild(focusedNodeId);
+                    }
+                  }}
+                />
+                )}
+              </div>
+            ) : (
+              <input
+                ref={titleRef}
+                type="text"
+                value={activeMemo.title}
+                readOnly={isSelectionMode}
+                onChange={(e) => updateMemoTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+                  e.preventDefault();
+                  addRootNode();
+                }}
+                placeholder={t("app.memoTitlePlaceholder")}
+                style={{
+                  color: EDITOR_STANDARD_TEXT_COLOR,
+                  caretColor: EDITOR_STANDARD_CARET_COLOR,
+                }}
+                className="mb-6 w-full bg-transparent font-mono text-3xl font-bold outline-none placeholder:text-zinc-700"
+              />
+            )}
+
+            <div
+              data-geo-editor-root
+              className="relative min-h-[45vh] pb-8"
+              onMouseDown={(e) => {
+                const t = e.target as HTMLElement;
+                if (!e.altKey) return;
+                if (t.closest('[data-geo-block="note-node"]')) return;
+                if (t.closest("[contenteditable]")) return;
+                if (t.closest("button, input, textarea, a")) return;
+                if (e.button !== 0) return;
+                const x = e.clientX;
+                const y = e.clientY;
+                isMarqueeRef.current = true;
+                marqueeOriginRef.current = { x, y };
+                setMarqueeRect({ left: x, top: y, width: 0, height: 0 });
+                setSelectedIds([]);
+                selectionAnchorRef.current = null;
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
+              <NodeList
+                memoType={activeMemo.memoType}
+                themeColor={memoThemeColor}
+                themeChromeAlphaMult={themeChromeAlphaMult}
+                nodes={displayNodes}
+                onActive={(id, editor) => {
+                  setActiveId(id);
+                  activeEditorRef.current = editor;
+                  setSelectedIds((prev) => {
+                    if (prev.length === 0) return prev;
+                    if (prev.includes(id)) return prev;
+                    selectionAnchorRef.current = null;
+                    return [];
+                  });
+                }}
+                onUpdate={setNodeContent}
+                onToggleCollapsed={toggleCollapsed}
+                onAddChild={addChild}
+                onAddSibling={addSibling}
+                onIndent={handleIndent}
+                onUnindent={handleUnindent}
+                onToggleCompleted={toggleCompleted}
+                onToggleHasCheckbox={toggleHasCheckbox}
+                onToggleNote={toggleNote}
+                onSetNote={setNote}
+                onSetBgColor={handleSetBgColor}
+                onSetHeading={handleSetHeading}
+                onPatchNodeContents={patchActiveNodeContents}
+                onSetNodeImageUrl={setNodeImageUrl}
+                onMemoColorSliderUndoGestureStart={beginMemoColorSliderUndoGesture}
+                onMemoColorSliderUndoGestureEnd={endMemoColorSliderUndoGesture}
+                onDelete={removeNode}
+                onDeleteEmpty={deleteNodeAndFocusPrev}
+                onFocusNode={handleFocusNode}
+                selectedIds={selectedIds}
+                isSelectionMode={isSelectionMode}
+                onSelectStart={handleBlockSelectMouseDown}
+                onPatchPluginData={patchNodePluginData}
+                onPatchGameData={patchNodeGameData}
+                onConvertToPluginCard={convertNodeToPluginCard}
+                onConvertToGameSpecCard={convertNodeToGameSpecCard}
+              />
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+      <CloudSyncIndicator
+        phase={cloudSync.phase}
+        message={cloudSync.message}
+        remoteEnabled={cloudSync.remoteEnabled}
+      />
     </div>
   );
 }
