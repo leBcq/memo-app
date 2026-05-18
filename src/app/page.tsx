@@ -22,7 +22,7 @@ import {
   EDITOR_STANDARD_TEXT_COLOR,
   EDITOR_STANDARD_CARET_COLOR,
 } from "@/lib/memoThemeColor";
-import { PanelLeft, PanelLeftClose, Menu, MousePointer2 } from "lucide-react";
+import { PanelLeft, PanelLeftClose, Menu, MousePointer2, X } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useMobileUiStore } from "@/stores/mobileUiStore";
 import type { MemoType } from "@/types/memoKind";
@@ -775,7 +775,7 @@ export default function Home() {
       />
 
       <ShareMemoModal fileItems={fileItems} />
-      <div className="relative z-0 flex min-h-0 min-w-0 flex-1 overflow-visible">
+      <div className="relative z-0 flex min-h-0 min-w-0 flex-1 overflow-x-hidden">
         {isSidebarOpen && (
           <button
             type="button"
@@ -785,6 +785,65 @@ export default function Home() {
           />
         )}
 
+        {/* Sidebar shell: outer = no overflow (mobile X sits here); inner = clips leaking text when width → 0 */}
+        <div
+          className={cn(
+            "relative flex h-full min-h-0 shrink-0 flex-col border-zinc-800/40 bg-zinc-950 transition-[transform,width] duration-300 ease-out",
+            "fixed top-0 left-0 z-50 h-full w-[80vw] max-w-[320px] translate-x-0 border-r border-zinc-800/40 shadow-[4px_0_28px_rgba(0,0,0,0.55)]",
+            "md:relative md:top-auto md:left-auto md:z-auto md:h-full md:max-w-none md:w-auto md:shrink-0 md:translate-x-0 md:shadow-none",
+            isSidebarOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full max-md:pointer-events-none",
+            isSidebarOpen && isMdUp ? "md:border-r md:border-zinc-800/40" : "",
+            !isSidebarOpen && isMdUp && "md:pointer-events-none md:border-r-0",
+          )}
+          style={isMdUp ? { width: isSidebarOpen ? sidebarWidth : 0 } : undefined}
+        >
+          <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden">
+            <FileSidebar
+              width={sidebarWidth}
+              fileItems={fileItems}
+              memos={memos}
+              activeMemoId={activeMemoId}
+              onSelectMemo={(id) => {
+                switchMemo(id);
+                if (typeof window !== "undefined" && !window.matchMedia("(min-width: 768px)").matches) {
+                  setIsSidebarOpen(false);
+                }
+              }}
+              onAddMemo={handleAddMemo}
+              onSetMemoType={setMemoType}
+              onAddFolder={addFolder}
+              onToggleFolder={toggleFolder}
+              onRenameItem={renameItem}
+              onDeleteItem={deleteFileItem}
+              onMoveItem={moveItem}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onDuplicateMemo={duplicateMemo}
+              onToggleBookmark={toggleBookmark}
+              onSetItemIcon={setItemIcon}
+              onSetItemColor={setItemColor}
+              onExportMemo={exportMemo}
+              onExportFullBackup={exportFullBackup}
+              onImportFullBackup={importFullBackupFromFile}
+              onMemoColorSliderUndoGestureStart={beginMemoColorSliderUndoGesture}
+              onMemoColorSliderUndoGestureEnd={endMemoColorSliderUndoGesture}
+              mobileDrawerLayout={!isMdUp}
+            />
+          </div>
+
+          {/* Mobile close — outside clipped inner panel so overflow-x-hidden does not hide it */}
+          {!isMdUp ? (
+            <button
+              type="button"
+              className="absolute top-3 right-3 z-[80] flex h-10 w-10 items-center justify-center rounded-full border border-zinc-600 bg-zinc-800 text-zinc-100 shadow-lg shadow-black/40 md:hidden"
+              aria-label={t("mobile.closeSidebar")}
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <X size={18} strokeWidth={2} className="shrink-0" />
+            </button>
+          ) : null}
+        </div>
+
+        {/* PC sidebar toggle — never inside the clipped sidebar panel; sibling in the flex row */}
         <button
           type="button"
           aria-expanded={isSidebarOpen}
@@ -799,57 +858,13 @@ export default function Home() {
             });
           }}
           className={cn(
-            "absolute top-2 z-[70] hidden h-8 w-8 items-center justify-center rounded-md border border-zinc-800/80 bg-zinc-950/95 text-zinc-400 shadow-lg shadow-black/30 backdrop-blur-sm transition-[left,transform,colors] duration-300 ease-out hover:border-cyan-500/40 hover:text-cyan-300 md:flex",
+            "pointer-events-auto absolute top-2 z-[80] hidden h-9 w-9 items-center justify-center rounded-md border border-zinc-700 bg-zinc-950 text-zinc-300 shadow-md transition-[left] duration-300 ease-out hover:border-cyan-500/45 hover:text-cyan-200 md:flex",
           )}
           style={{ left: isSidebarOpen ? sidebarWidth + 6 : 10 }}
           title={isSidebarOpen ? t("app.sidebarHide") : t("app.sidebarShow")}
         >
           {isSidebarOpen ? <PanelLeftClose size={18} strokeWidth={1.75} /> : <PanelLeft size={18} strokeWidth={1.75} />}
         </button>
-
-        <div
-          className={cn(
-            "flex h-full min-h-0 flex-col overflow-visible border-zinc-800/40 bg-zinc-950 transition-transform duration-300 ease-out",
-            "fixed top-0 left-0 z-50 h-full w-[80vw] max-w-[320px] border-r border-zinc-800/40 shadow-[4px_0_28px_rgba(0,0,0,0.55)]",
-            "md:relative md:top-auto md:left-auto md:z-auto md:h-full md:max-w-none md:w-auto md:shrink-0 md:shadow-none",
-            isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-            !isSidebarOpen && "max-md:pointer-events-none",
-            isSidebarOpen && isMdUp ? "md:border-r md:border-zinc-800/40" : "",
-            !isSidebarOpen && isMdUp && "md:pointer-events-none md:border-r-0",
-          )}
-          style={isMdUp ? { width: isSidebarOpen ? sidebarWidth : 0 } : undefined}
-        >
-          <FileSidebar
-            width={sidebarWidth}
-            fileItems={fileItems}
-            memos={memos}
-            activeMemoId={activeMemoId}
-            onSelectMemo={(id) => {
-              switchMemo(id);
-              if (typeof window !== "undefined" && !window.matchMedia("(min-width: 768px)").matches) {
-                setIsSidebarOpen(false);
-              }
-            }}
-            onAddMemo={handleAddMemo}
-            onSetMemoType={setMemoType}
-            onAddFolder={addFolder}
-            onToggleFolder={toggleFolder}
-            onRenameItem={renameItem}
-            onDeleteItem={deleteFileItem}
-            onMoveItem={moveItem}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onDuplicateMemo={duplicateMemo}
-            onToggleBookmark={toggleBookmark}
-            onSetItemIcon={setItemIcon}
-            onSetItemColor={setItemColor}
-            onExportMemo={exportMemo}
-            onExportFullBackup={exportFullBackup}
-            onImportFullBackup={importFullBackupFromFile}
-            onMemoColorSliderUndoGestureStart={beginMemoColorSliderUndoGesture}
-            onMemoColorSliderUndoGestureEnd={endMemoColorSliderUndoGesture}
-            onMobileDrawerClose={isMdUp ? undefined : () => setIsSidebarOpen(false)}
-          />
-        </div>
 
         {/* Resize handle — desktop only */}
         <div
@@ -895,7 +910,7 @@ export default function Home() {
           {/* Mode strip: music tools or gamedev spec tools (fixed h-9). */}
           <div
             className={cn(
-              "relative z-30 h-9 shrink-0 overflow-visible transition-[border-color,background-color] duration-300 ease-in-out",
+              "relative z-30 h-9 shrink-0 overflow-visible transition-[border-color,background-color] duration-300 ease-in-out md:pl-14",
               (activeMemo.memoType === "music" && activeMemo.musicMeta) || activeMemo.memoType === "gamedev"
                 ? "bg-zinc-950/95"
                 : "border-b border-zinc-800/35 bg-zinc-950",

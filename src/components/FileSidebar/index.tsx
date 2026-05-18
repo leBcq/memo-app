@@ -8,7 +8,7 @@ import {
 import { createPortal } from "react-dom";
 import {
   FolderPlus, Pencil, Trash2, Download, Upload,
-  Star, StarOff, Copy, Archive, Settings, FileText, X,
+  Star, StarOff, Copy, Archive, Settings, FileText,
   Music2, Gamepad2, Music, Smile, Share2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -70,7 +70,8 @@ type Props = {
   onImportFullBackup: (file: File) => void | Promise<void>;
   onMemoColorSliderUndoGestureStart?: () => void;
   onMemoColorSliderUndoGestureEnd?: () => void;
-  onMobileDrawerClose?: () => void;
+  /** Mobile drawer: full-width + scroll top padding for overlay close control (close button lives in page.tsx). */
+  mobileDrawerLayout?: boolean;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -483,7 +484,7 @@ export function FileSidebar({
   onImportFullBackup,
   onMemoColorSliderUndoGestureStart,
   onMemoColorSliderUndoGestureEnd,
-  onMobileDrawerClose,
+  mobileDrawerLayout,
 }: Props) {
   const { t } = useTranslation();
   const openShareModal = useShareModalStore((s) => s.openShareModal);
@@ -601,31 +602,19 @@ export function FileSidebar({
   return (
     <aside
       className={cn(
-        "relative flex h-full min-h-0 shrink-0 flex-col overflow-visible bg-zinc-950",
-        onMobileDrawerClose && "w-full min-w-0",
+        "relative flex h-full min-h-0 shrink-0 flex-col overflow-x-hidden bg-zinc-950",
+        mobileDrawerLayout && "w-full min-w-0",
       )}
-      style={onMobileDrawerClose ? undefined : { width }}
+      style={mobileDrawerLayout ? undefined : { width }}
     >
       {/* Desktop header — outside scroll */}
       <div className="hidden items-center justify-between gap-2 border-b border-zinc-800/70 px-3 py-2 md:flex">
         <span className="font-mono text-[9px] tracking-[3px] text-zinc-600">{t("sidebar.myFiles")}</span>
       </div>
 
-      {/* Mobile drawer close — outside scroll so it never scrolls away (sibling of overflow-y-auto) */}
-      {onMobileDrawerClose ? (
-        <button
-          type="button"
-          className="absolute top-3 right-3 z-[70] flex h-9 w-9 items-center justify-center rounded-md border border-zinc-600/80 bg-zinc-900/95 text-zinc-300 shadow-lg shadow-black/50 transition-colors hover:border-cyan-500/50 hover:bg-zinc-800 hover:text-zinc-50 md:hidden"
-          aria-label={t("mobile.closeSidebar")}
-          onClick={onMobileDrawerClose}
-        >
-          <X size={17} strokeWidth={2} />
-        </button>
-      ) : null}
-
-      {/* Scroll area — max-md:pt-12 keeps first item clear of the fixed close control */}
+      {/* Scroll area — mobile: pt for page-level close FAB */}
       <div
-        className={cn("min-h-0 flex-1 overflow-y-auto", onMobileDrawerClose && "max-md:pt-12")}
+        className={cn("min-h-0 flex-1 overflow-y-auto overflow-x-hidden", mobileDrawerLayout && "max-md:pt-16")}
         onContextMenu={(e) => {
           e.preventDefault();
           const menuW = 220;
@@ -637,7 +626,7 @@ export function FileSidebar({
           });
         }}
       >
-        {onMobileDrawerClose ? (
+        {mobileDrawerLayout ? (
           <div
             className="border-b border-zinc-800/70 px-3 py-2 md:hidden"
             onContextMenu={(e) => e.stopPropagation()}
