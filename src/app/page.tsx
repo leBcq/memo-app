@@ -100,6 +100,10 @@ const SIDEBAR_MIN = 160;
 const SIDEBAR_MAX = 600;
 const SIDEBAR_DEFAULT = 208; // ≈ w-52
 
+/** Memo/outline contenteditables use the app-wide undo stack; others (e.g. BPM) keep native text undo. */
+const GLOBAL_UNDO_CONTENTEDITABLE_SELECTOR =
+  '[data-geo-editor="body"],[data-geo-editor="focus-title"],[data-geo-editor="plugin-card"],[data-geo-editor="game-spec-card"]';
+
 /** When true, let the browser handle Ctrl/Cmd+Z so field text undo is not swallowed. */
 function shouldDeferGlobalUndoToNative(): boolean {
   const el = document.activeElement;
@@ -120,7 +124,10 @@ function shouldDeferGlobalUndoToNative(): boolean {
   }
   if (el instanceof HTMLTextAreaElement) return true;
   if (el instanceof HTMLSelectElement) return true;
-  if (el instanceof HTMLElement && el.isContentEditable) return true;
+  if (el instanceof HTMLElement && el.isContentEditable) {
+    if (el.closest(GLOBAL_UNDO_CONTENTEDITABLE_SELECTOR)) return false;
+    return true;
+  }
   return false;
 }
 
@@ -238,6 +245,7 @@ export default function Home() {
     setItemColor,
     exportMemo,
     exportFullBackup,
+    importFullBackupFromFile,
     canUndo,
     canRedo,
     undo,
@@ -454,14 +462,22 @@ export default function Home() {
   // ── Global keyboard shortcuts (Undo/Redo + Focus) ─────────────────────────
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Undo/Redo (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z)
+      if (commandPaletteOpen || settingsOpen) return;
+
+      // Undo/Redo (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z) — capture runs before contenteditable swallows keys
       const meta = e.ctrlKey || e.metaKey;
       if (meta) {
         const key = e.key.toLowerCase();
-        const undoRedo = key === "y" || (key === "z" && e.shiftKey) ? "redo" : key === "z" && !e.shiftKey ? "undo" : null;
+        const undoRedo =
+          key === "y" || (key === "z" && e.shiftKey)
+            ? "redo"
+            : key === "z" && !e.shiftKey
+              ? "undo"
+              : null;
         if (undoRedo) {
           if (shouldDeferGlobalUndoToNative()) return;
           e.preventDefault();
+          e.stopPropagation();
           if (undoRedo === "undo") undo();
           else redo();
           return;
@@ -484,9 +500,19 @@ export default function Home() {
         }
       }
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [undo, redo, activeId, focusedPath, handleFocusNode, handleUnfocus, settings.keymap]);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [
+    undo,
+    redo,
+    activeId,
+    focusedPath,
+    handleFocusNode,
+    handleUnfocus,
+    settings.keymap,
+    commandPaletteOpen,
+    settingsOpen,
+  ]);
 
   // Commit rich-text / title edits to the global undo stack when focus leaves the memo workspace.
   useEffect(() => {
@@ -749,7 +775,7 @@ export default function Home() {
       />
 
       <ShareMemoModal fileItems={fileItems} />
-      <div className="relative flex min-h-0 min-w-0 flex-1">
+      <div className="relative z-0 flex min-h-0 min-w-0 flex-1 overflow-visible">
         {isSidebarOpen && (
           <button
             type="button"
@@ -773,7 +799,7 @@ export default function Home() {
             });
           }}
           className={cn(
-            "absolute top-2 z-30 hidden h-8 w-8 items-center justify-center rounded-md border border-zinc-800/80 bg-zinc-950/95 text-zinc-400 shadow-lg shadow-black/30 backdrop-blur-sm transition-[left,transform,colors] duration-300 ease-out hover:border-cyan-500/40 hover:text-cyan-300 md:flex",
+            "absolute top-2 z-[70] hidden h-8 w-8 items-center justify-center rounded-md border border-zinc-800/80 bg-zinc-950/95 text-zinc-400 shadow-lg shadow-black/30 backdrop-blur-sm transition-[left,transform,colors] duration-300 ease-out hover:border-cyan-500/40 hover:text-cyan-300 md:flex",
           )}
           style={{ left: isSidebarOpen ? sidebarWidth + 6 : 10 }}
           title={isSidebarOpen ? t("app.sidebarHide") : t("app.sidebarShow")}
@@ -783,7 +809,7 @@ export default function Home() {
 
         <div
           className={cn(
-            "flex h-full min-h-0 flex-col overflow-hidden border-zinc-800/40 bg-zinc-950 transition-transform duration-300 ease-out",
+            "flex h-full min-h-0 flex-col overflow-visible border-zinc-800/40 bg-zinc-950 transition-transform duration-300 ease-out",
             "fixed top-0 left-0 z-50 h-full w-[80vw] max-w-[320px] border-r border-zinc-800/40 shadow-[4px_0_28px_rgba(0,0,0,0.55)]",
             "md:relative md:top-auto md:left-auto md:z-auto md:h-full md:max-w-none md:w-auto md:shrink-0 md:shadow-none",
             isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
@@ -818,6 +844,7 @@ export default function Home() {
             onSetItemColor={setItemColor}
             onExportMemo={exportMemo}
             onExportFullBackup={exportFullBackup}
+            onImportFullBackup={importFullBackupFromFile}
             onMemoColorSliderUndoGestureStart={beginMemoColorSliderUndoGesture}
             onMemoColorSliderUndoGestureEnd={endMemoColorSliderUndoGesture}
             onMobileDrawerClose={isMdUp ? undefined : () => setIsSidebarOpen(false)}
@@ -850,7 +877,7 @@ export default function Home() {
           />
         )}
 
-        <div ref={memoWorkspaceRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div ref={memoWorkspaceRef} data-memo-workspace className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="flex h-10 shrink-0 items-center gap-2 border-b border-zinc-800/50 bg-zinc-950/95 px-2 md:hidden">
             <button
               type="button"

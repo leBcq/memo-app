@@ -41,6 +41,8 @@ import {
 import {
   buildFreaviaFullBackupV1,
   downloadFreaviaBackupJson,
+  parseFreaviaFullBackupJson,
+  applyFreaviaBackupLocalStoragePatches,
 } from "@/lib/freaviaBackup";
 import {
   cloneWorkspaceSnapshot,
@@ -56,12 +58,16 @@ import {
 } from "@/hooks/useHistory";
 import {
   fetchUserMemos,
+  fetchUserFolders,
   insertMemoRow,
   upsertMemoRow,
   deleteMemoRow,
   memoRowToMemo,
   fileItemFromRow,
   cloudMemoFingerprint,
+  cloudFoldersFingerprint,
+  replaceUserFolders,
+  folderRowToFileItem,
   remapInvalidMemoIds,
   newMemoUuid,
   isUuid,
@@ -86,6 +92,11 @@ const makeId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID().slice(0, 8)
     : `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+const newFolderId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : makeId();
 
 /** Common electronic track sections — each becomes a parent node with one empty child. */
 const ELECTRONIC_SONG_STRUCTURE_LABELS = [
@@ -232,6 +243,32 @@ function normalizeFileItem(raw: unknown): FileItem | null {
   };
 }
 
+function syncMemoTypesIntoFileItems(memos: Memo[], items: FileItem[]): FileItem[] {
+  const byId = new Map(memos.map((m) => [m.id, m]));
+  return items.map((it) => {
+    if (it.type !== "memo") return it;
+    const m = byId.get(it.id);
+    return m ? { ...it, memoType: m.memoType } : it;
+  });
+}
+
+function ensureFileItemsCoverMemos(memos: Memo[], items: FileItem[]): FileItem[] {
+  const memoIds = new Set(items.filter((i) => i.type === "memo").map((i) => i.id));
+  const maxOrder = items.reduce((max, i) => Math.max(max, i.order), 0);
+  const missing: FileItem[] = memos
+    .filter((m) => !memoIds.has(m.id))
+    .map((m, idx) => ({
+      id: m.id,
+      type: "memo" as const,
+      name: m.title || "Untitled Memo",
+      parentId: null,
+      isOpen: false,
+      order: maxOrder + idx + 1,
+      memoType: m.memoType,
+    }));
+  return missing.length > 0 ? [...items, ...missing] : items;
+}
+
 function loadFileSystem(memos: Memo[]): FileItem[] {
   const memoById = new Map(memos.map((m) => [m.id, m]));
   const syncMemoRow = (it: FileItem): FileItem => {
@@ -298,6 +335,7 @@ export function useMemos() {
   const [cloudMessage, setCloudMessage] = useState<string | undefined>();
   const [cloudReady, setCloudReady] = useState(false);
   const lastCloudFingerprintRef = useRef<Map<string, string>>(new Map());
+  const lastCloudFolderFingerprintRef = useRef<string>("");
   const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const memosRef = useRef(memos);
@@ -429,6 +467,7 @@ export function useMemos() {
       setCloudPhase("idle");
       setCloudMessage(undefined);
       lastCloudFingerprintRef.current.clear();
+      lastCloudFolderFingerprintRef.current = "";
       return;
     }
 
@@ -445,7 +484,19 @@ export function useMemos() {
         if (rows.length > 0) {
           const memosFromCloud = rows.map((r) => memoRowToMemo(r));
           const itemsFromCloud = rows.map((r, i) => fileItemFromRow(memosFromCloud[i]!, r));
-          const folderItems = fileItemsRef.current.filter((i) => i.type === "folder");
+
+          let foldersFromCloud: FileItem[] = [];
+          try {
+            const folderRows = await fetchUserFolders(client, user.id);
+            foldersFromCloud = folderRows.map(folderRowToFileItem);
+          } catch (folderErr) {
+            console.warn("[freavia] freavia_folders fetch failed — run DB migration?", folderErr);
+          }
+
+          const localFolderItems = fileItemsRef.current.filter((i) => i.type === "folder");
+          const folderItems =
+            foldersFromCloud.length > 0 ? foldersFromCloud : localFolderItems;
+
           const mergedFileItems = [...folderItems, ...itemsFromCloud];
 
           lastCloudFingerprintRef.current.clear();
@@ -453,6 +504,7 @@ export function useMemos() {
             const it = mergedFileItems.find((i) => i.id === m.id && i.type === "memo");
             lastCloudFingerprintRef.current.set(m.id, cloudMemoFingerprint(m, it));
           }
+          lastCloudFolderFingerprintRef.current = cloudFoldersFingerprint(folderItems);
 
           historyRef.current = new Map();
           setCanUndo(false);
@@ -471,6 +523,13 @@ export function useMemos() {
             const it = fis.find((i) => i.id === m.id && i.type === "memo");
             await insertMemoRow(client, user.id, m, it);
             lastCloudFingerprintRef.current.set(m.id, cloudMemoFingerprint(m, it));
+          }
+          const localFolders = fis.filter((i) => i.type === "folder");
+          try {
+            await replaceUserFolders(client, user.id, localFolders);
+            lastCloudFolderFingerprintRef.current = cloudFoldersFingerprint(localFolders);
+          } catch (folderErr) {
+            console.warn("[freavia] freavia_folders bootstrap failed — run DB migration?", folderErr);
           }
         }
 
@@ -512,6 +571,14 @@ export function useMemos() {
             await upsertMemoRow(client, user.id, m, it);
             lastCloudFingerprintRef.current.set(m.id, fp);
           }
+
+          const folderItems = fileItemsRef.current.filter((i) => i.type === "folder");
+          const folderFp = cloudFoldersFingerprint(folderItems);
+          if (lastCloudFolderFingerprintRef.current !== folderFp) {
+            await replaceUserFolders(client, user.id, folderItems);
+            lastCloudFolderFingerprintRef.current = folderFp;
+          }
+
           setCloudPhase("saved");
           window.setTimeout(() => {
             setCloudPhase((p) => (p === "saved" ? "idle" : p));
@@ -789,7 +856,7 @@ export function useMemos() {
   // ── File-system operations ────────────────────────────────────────────────
   const addFolder = useCallback((parentId: string | null, name: string) => {
     const newFolder: FileItem = {
-      id: makeId(),
+      id: newFolderId(),
       type: "folder",
       name: name.trim() || "New Folder",
       parentId,
@@ -1500,6 +1567,67 @@ export function useMemos() {
     [updateActiveNodes],
   );
 
+  const importFullBackupFromFile = useCallback(
+    async (file: File) => {
+      const text = await file.text();
+      const backup = parseFreaviaFullBackupJson(text);
+      let memosNext = backup.data.memos.map((m) => normalizeMemo(m as Partial<Memo>));
+      let fileItemsNext = backup.data.fileItems
+        .map(normalizeFileItem)
+        .filter(Boolean) as FileItem[];
+      fileItemsNext = syncMemoTypesIntoFileItems(memosNext, fileItemsNext);
+      fileItemsNext = ensureFileItemsCoverMemos(memosNext, fileItemsNext);
+      let activeId = backup.data.activeMemoId;
+      if (!memosNext.some((m) => m.id === activeId)) {
+        activeId = memosNext[0]!.id;
+      }
+      const remapped = remapInvalidMemoIds(memosNext, fileItemsNext, activeId);
+      if (remapped) {
+        memosNext = remapped.memos;
+        fileItemsNext = remapped.fileItems;
+        activeId = remapped.activeMemoId;
+      }
+      memosNext = mergeMemosThemeFromSidebarLabels(memosNext, fileItemsNext);
+      applyFreaviaBackupLocalStoragePatches(backup.data);
+
+      historyRef.current = new Map();
+      setCanUndo(false);
+      setCanRedo(false);
+      lastCloudFingerprintRef.current.clear();
+      lastCloudFolderFingerprintRef.current = "";
+      setMemos(memosNext);
+      setFileItems(fileItemsNext);
+      setActiveMemoId(activeId);
+
+      const client = getSupabaseBrowserClient();
+      if (cloudReady && user && client) {
+        setCloudPhase("saving");
+        setCloudMessage(undefined);
+        try {
+          for (const m of memosNext) {
+            if (!isUuid(m.id)) continue;
+            const it = fileItemsNext.find((i) => i.id === m.id && i.type === "memo");
+            await upsertMemoRow(client, user.id, m, it);
+            lastCloudFingerprintRef.current.set(m.id, cloudMemoFingerprint(m, it));
+          }
+          const folders = fileItemsNext.filter((i) => i.type === "folder");
+          await replaceUserFolders(client, user.id, folders);
+          lastCloudFolderFingerprintRef.current = cloudFoldersFingerprint(folders);
+          setCloudPhase("saved");
+          window.setTimeout(() => {
+            setCloudPhase((p) => (p === "saved" ? "idle" : p));
+          }, 1400);
+        } catch (e) {
+          console.error(e);
+          setCloudPhase("error");
+          setCloudMessage(e instanceof Error ? e.message : "Import sync failed");
+          throw e;
+        }
+      }
+    },
+    [cloudReady, user],
+  );
+
   const exportFullBackup = useCallback(() => {
     const payload = buildFreaviaFullBackupV1(
       memosRef.current,
@@ -1535,6 +1663,7 @@ export function useMemos() {
     setItemColor,
     exportMemo,
     exportFullBackup,
+    importFullBackupFromFile,
     // history
     canUndo,
     canRedo,

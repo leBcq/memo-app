@@ -259,6 +259,100 @@ export async function deleteMemoRow(client: SupabaseClient, userId: string, id: 
   if (error) throw error;
 }
 
+// ── Folder rows (`freavia_folders`) ───────────────────────────────────────────
+
+export type FreaviaFolderDbRow = {
+  id: string;
+  user_id: string;
+  parent_id: string | null;
+  name: string;
+  sort_order: number;
+  is_open: boolean;
+  is_bookmarked: boolean;
+  icon: string | null;
+  color: string | null;
+  updated_at?: string;
+};
+
+export function folderRowToFileItem(row: FreaviaFolderDbRow): FileItem {
+  const it: FileItem = {
+    id: row.id,
+    type: "folder",
+    name: typeof row.name === "string" ? row.name : "",
+    parentId: row.parent_id,
+    isOpen: Boolean(row.is_open),
+    order: typeof row.sort_order === "number" ? row.sort_order : 0,
+  };
+  if (row.is_bookmarked) it.isBookmarked = true;
+  if (row.icon) it.icon = row.icon;
+  const col = normalizeFileItemStoredColor(row.color);
+  if (col !== undefined) it.color = col;
+  return it;
+}
+
+/** Stable fingerprint for debounced folder sync. */
+export function cloudFoldersFingerprint(folders: FileItem[]): string {
+  const list = folders
+    .filter((f) => f.type === "folder")
+    .map((f) => ({
+      id: f.id,
+      parentId: f.parentId,
+      name: f.name,
+      order: f.order,
+      isOpen: f.isOpen,
+      isBookmarked: f.isBookmarked ?? false,
+      icon: f.icon,
+      color: f.color,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  return JSON.stringify(list);
+}
+
+export async function fetchUserFolders(
+  client: SupabaseClient,
+  userId: string,
+): Promise<FreaviaFolderDbRow[]> {
+  const { data, error } = await client
+    .from("freavia_folders")
+    .select(
+      "id,user_id,parent_id,name,sort_order,is_open,is_bookmarked,icon,color,updated_at",
+    )
+    .eq("user_id", userId)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as FreaviaFolderDbRow[];
+}
+
+/** Replace the user's folder tree in Supabase (simple snapshot sync). */
+export async function replaceUserFolders(
+  client: SupabaseClient,
+  userId: string,
+  folders: FileItem[],
+): Promise<void> {
+  const { error: delErr } = await client.from("freavia_folders").delete().eq("user_id", userId);
+  if (delErr) throw delErr;
+
+  const rows = folders
+    .filter((f) => f.type === "folder")
+    .map((f) => ({
+      id: f.id,
+      user_id: userId,
+      parent_id: f.parentId,
+      name: f.name,
+      sort_order: f.order,
+      is_open: f.isOpen,
+      is_bookmarked: f.isBookmarked ?? false,
+      icon: f.icon ?? null,
+      color: f.color != null && f.color !== "" ? String(f.color) : null,
+      updated_at: new Date().toISOString(),
+    }));
+
+  if (rows.length === 0) return;
+
+  const { error: insErr } = await client.from("freavia_folders").insert(rows);
+  if (insErr) throw insErr;
+}
+
 /**
  * Remap non-UUID memo ids (legacy localStorage) so Supabase uuid PK accepts them.
  * Folder ids stay unchanged; only memo rows in fileItems are rewritten when their id maps.

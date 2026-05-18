@@ -1,12 +1,13 @@
 "use client";
 
 import {
-  useEffect, useRef, useState,
+  useEffect, useRef, useState, useLayoutEffect,
   type CSSProperties,
   type DragEvent, type KeyboardEvent, type MouseEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import {
-  FolderPlus, Pencil, Trash2, Download,
+  FolderPlus, Pencil, Trash2, Download, Upload,
   Star, StarOff, Copy, Archive, Settings, FileText, X,
   Music2, Gamepad2, Music, Smile, Share2,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import type { Memo } from "@/hooks/useMemos";
 import { adjustStoredColorAlpha, parseStoredColor } from "@/lib/menuColorUtils";
 import { RowTintColorPicker } from "@/components/MenuColorPicker/RowTintColorPicker";
 import { SidebarAuthBar } from "@/components/Auth";
+import { FreaviaBackupParseError } from "@/lib/freaviaBackup";
 import {
   fileItemColorToPickerValue,
   FILE_ITEM_LABEL_SWATCH_HEX,
@@ -35,7 +37,10 @@ const DRAG_TYPE = "application/geo-memo-item";
 
 type DropPosition = "before" | "after" | "inside";
 type DropIndicator = { targetId: string; position: DropPosition } | null;
-type ContextMenuState = { item: FileItem; x: number; y: number } | null;
+type ContextMenuState =
+  | { kind: "item"; item: FileItem; x: number; y: number }
+  | { kind: "empty"; x: number; y: number }
+  | null;
 type DeleteDialogState = { item: FileItem; displayName: string } | null;
 
 type Props = {
@@ -62,6 +67,7 @@ type Props = {
   ) => void;
   onExportMemo: (id: string) => void;
   onExportFullBackup: () => void;
+  onImportFullBackup: (file: File) => void | Promise<void>;
   onMemoColorSliderUndoGestureStart?: () => void;
   onMemoColorSliderUndoGestureEnd?: () => void;
   onMobileDrawerClose?: () => void;
@@ -319,13 +325,16 @@ function FavoriteItemRow({
       <div
         className={cn(
           labelClass,
-          "group flex cursor-pointer items-center gap-1.5 py-[3px] pr-2 font-mono text-[11px] tracking-wide transition-colors",
+          "group flex w-full min-w-0 cursor-pointer items-center gap-1.5 py-[3px] pr-2 font-mono text-[11px] tracking-wide transition-colors",
         )}
         style={{ ...labelStyle, paddingLeft: `${20 + depth * 12}px` }}
         onMouseEnter={() => setRowHover(true)}
         onMouseLeave={() => setRowHover(false)}
         onClick={handleClick}
-        onContextMenu={(e) => onContextMenu(e, item)}
+        onContextMenu={(e) => {
+          e.stopPropagation();
+          onContextMenu(e, item);
+        }}
       >
         {isFolder ? (
           <span
@@ -427,6 +436,7 @@ function FavoritesSection({
       <button
         type="button"
         onClick={() => setSectionOpen((p) => !p)}
+        onContextMenu={(e) => e.stopPropagation()}
         className="flex w-full items-center gap-1.5 px-3 py-1.5 font-mono text-[9px] tracking-[2px] text-zinc-500 transition-colors hover:text-zinc-300"
       >
         <svg
@@ -470,6 +480,7 @@ export function FileSidebar({
   onToggleFolder, onRenameItem, onDeleteItem, onMoveItem, onOpenSettings,
   onDuplicateMemo, onToggleBookmark, onSetItemIcon, onSetItemColor, onExportMemo,
   onExportFullBackup,
+  onImportFullBackup,
   onMemoColorSliderUndoGestureStart,
   onMemoColorSliderUndoGestureEnd,
   onMobileDrawerClose,
@@ -489,6 +500,7 @@ export function FileSidebar({
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null);
+  const importBackupInputRef = useRef<HTMLInputElement>(null);
 
   const commitNewFolder = () => {
     if (newFolderParentId !== undefined) {
@@ -571,9 +583,11 @@ export function FileSidebar({
     },
     onContextMenu: (e, item) => {
       e.preventDefault();
+      e.stopPropagation();
       const menuW = 220;
       const menuH = item.type === "folder" ? 420 : 520;
       setContextMenu({
+        kind: "item",
         item,
         x: Math.min(e.clientX, window.innerWidth - menuW - 4),
         y: Math.min(e.clientY, window.innerHeight - menuH - 4),
@@ -587,28 +601,53 @@ export function FileSidebar({
   return (
     <aside
       className={cn(
-        "flex h-full min-h-0 shrink-0 flex-col bg-zinc-950",
+        "relative flex h-full min-h-0 shrink-0 flex-col overflow-visible bg-zinc-950",
         onMobileDrawerClose && "w-full min-w-0",
       )}
       style={onMobileDrawerClose ? undefined : { width }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2 border-b border-zinc-800/70 px-3 py-2">
+      {/* Desktop header — outside scroll */}
+      <div className="hidden items-center justify-between gap-2 border-b border-zinc-800/70 px-3 py-2 md:flex">
         <span className="font-mono text-[9px] tracking-[3px] text-zinc-600">{t("sidebar.myFiles")}</span>
-        {onMobileDrawerClose && (
-          <button
-            type="button"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-zinc-700/80 bg-zinc-900/60 text-zinc-400 transition-colors hover:border-zinc-500 hover:bg-zinc-800/80 hover:text-zinc-100 md:hidden"
-            aria-label={t("mobile.closeSidebar")}
-            onClick={onMobileDrawerClose}
-          >
-            <X size={15} strokeWidth={2} />
-          </button>
-        )}
       </div>
 
-      {/* Scroll area */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Mobile drawer close — outside scroll so it never scrolls away (sibling of overflow-y-auto) */}
+      {onMobileDrawerClose ? (
+        <button
+          type="button"
+          className="absolute top-3 right-3 z-[70] flex h-9 w-9 items-center justify-center rounded-md border border-zinc-600/80 bg-zinc-900/95 text-zinc-300 shadow-lg shadow-black/50 transition-colors hover:border-cyan-500/50 hover:bg-zinc-800 hover:text-zinc-50 md:hidden"
+          aria-label={t("mobile.closeSidebar")}
+          onClick={onMobileDrawerClose}
+        >
+          <X size={17} strokeWidth={2} />
+        </button>
+      ) : null}
+
+      {/* Scroll area — max-md:pt-12 keeps first item clear of the fixed close control */}
+      <div
+        className={cn("min-h-0 flex-1 overflow-y-auto", onMobileDrawerClose && "max-md:pt-12")}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          const menuW = 220;
+          const menuH = 240;
+          setContextMenu({
+            kind: "empty",
+            x: Math.min(e.clientX, window.innerWidth - menuW - 4),
+            y: Math.min(e.clientY, window.innerHeight - menuH - 4),
+          });
+        }}
+      >
+        {onMobileDrawerClose ? (
+          <div
+            className="border-b border-zinc-800/70 px-3 py-2 md:hidden"
+            onContextMenu={(e) => e.stopPropagation()}
+          >
+            <span className="font-mono text-[9px] tracking-[3px] text-zinc-600">
+              {t("sidebar.myFiles")}
+            </span>
+          </div>
+        ) : null}
+
         {/* Favorites section (above the tree) */}
         <FavoritesSection
           fileItems={fileItems}
@@ -695,6 +734,42 @@ export function FileSidebar({
             <Download size={11} className="shrink-0 opacity-60" strokeWidth={2} />
             <span>{t("sidebar.exportDataJson")}</span>
           </button>
+          <input
+            ref={importBackupInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="sr-only"
+            aria-hidden
+            tabIndex={-1}
+            onChange={async (e) => {
+              const input = e.currentTarget;
+              const file = input.files?.[0];
+              input.value = "";
+              if (!file) return;
+              try {
+                await Promise.resolve(onImportFullBackup(file));
+              } catch (err) {
+                const msg =
+                  err instanceof FreaviaBackupParseError
+                    ? err.code === "INVALID_JSON"
+                      ? t("sidebar.importErrorInvalidJson")
+                      : t("sidebar.importErrorInvalidBackup")
+                    : err instanceof Error
+                      ? err.message
+                      : t("sidebar.importErrorRead");
+                window.alert(msg);
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => importBackupInputRef.current?.click()}
+            className="flex w-full items-center gap-2 px-2 py-1.5 font-mono text-[10px] tracking-wide text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-zinc-300"
+            title={t("sidebar.importTitle")}
+          >
+            <Upload size={11} className="shrink-0 opacity-60" strokeWidth={2} />
+            <span>{t("sidebar.importDataJson")}</span>
+          </button>
           <button type="button" onClick={onOpenSettings}
             className="flex w-full items-center gap-2 px-2 py-1.5 font-mono text-[10px] tracking-wide text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-zinc-300">
             <Settings size={11} className="shrink-0" />
@@ -706,8 +781,8 @@ export function FileSidebar({
         </div>
       </div>
 
-      {/* Right-click context menu */}
-      {contextMenu && (
+      {/* Right-click context menu (item or empty space) */}
+      {contextMenu?.kind === "item" ? (
         <SidebarContextMenu
           item={contextMenu.item}
           activeMemoId={activeMemoId}
@@ -745,7 +820,31 @@ export function FileSidebar({
             setContextMenu(null);
           }}
         />
-      )}
+      ) : contextMenu?.kind === "empty" ? (
+        <SidebarEmptySpaceContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onAddStandard={() => {
+            onAddMemo(null, "standard");
+            setContextMenu(null);
+          }}
+          onAddMusic={() => {
+            onAddMemo(null, "music");
+            setContextMenu(null);
+          }}
+          onAddGamedev={() => {
+            onAddMemo(null, "gamedev");
+            setContextMenu(null);
+          }}
+          onAddFolder={() => {
+            setNewFolderParentId(null);
+            setNewFolderName("");
+            setContextMenu(null);
+            requestAnimationFrame(() => newFolderInputRef.current?.focus());
+          }}
+        />
+      ) : null}
 
       {/* Delete confirmation dialog */}
       {deleteDialog && (
@@ -870,6 +969,14 @@ function FileNode({
   const commitRename = () => onCommitRename(item.id, renameVal.trim() || displayName);
   const commitIconEdit = () => onCommitIconEdit(item.id, iconVal.trim());
 
+  const rowInnerClick = (e: MouseEvent<HTMLDivElement>) => {
+    if (isRenaming || isIconEditing) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-sidebar-no-toggle="true"]')) return;
+    if (target.closest("input, textarea, button, a")) return;
+    handleClick();
+  };
+
   const handleRenameKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") { e.preventDefault(); commitRename(); }
     if (e.key === "Escape") { setRenameVal(displayName); onCommitRename(item.id, item.name); }
@@ -906,12 +1013,18 @@ function FileNode({
         onDragOver={(e) => onDragOverItem(e, item)}
         onDragLeave={() => onDragLeaveItem(item)}
         onDrop={(e) => onDropOnItem(e, item)}
-        onContextMenu={(e) => onContextMenu(e, item)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onContextMenu(e, item);
+        }}
         onMouseEnter={() => setRowHover(true)}
         onMouseLeave={() => setRowHover(false)}
+        onClick={rowInnerClick}
         className={cn(
           labelClass,
-          "group flex cursor-grab items-center gap-1 py-[3px] pr-1 font-mono text-[11px] tracking-wide transition-colors active:cursor-grabbing",
+          "group flex w-full min-w-0 items-center gap-1 py-[3px] pr-1 font-mono text-[11px] tracking-wide transition-colors active:cursor-grabbing",
+          item.type === "folder" && !isRenaming ? "cursor-pointer" : "cursor-grab",
           isDragging && "opacity-40",
         )}
         style={{ ...labelStyle, paddingLeft: `${indent + 8}px` }}
@@ -959,7 +1072,6 @@ function FileNode({
           <span
             className="min-w-0 flex-1 select-none truncate"
             style={item.type === "memo" && !isActiveMemo ? { color: memoTitleHue } : undefined}
-            onClick={handleClick}
             title={displayName}
           >
             {displayName || (
@@ -1024,7 +1136,11 @@ function NewFolderRow({ depth, value, inputRef, onChange, onCommit, onCancel }: 
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center gap-1 py-[3px] pr-1" style={{ paddingLeft: `${depth * 12 + 8}px` }}>
+    <div
+      className="flex items-center gap-1 py-[3px] pr-1"
+      style={{ paddingLeft: `${depth * 12 + 8}px` }}
+      onContextMenu={(e) => e.stopPropagation()}
+    >
       <span className="h-3 w-3 shrink-0" />
       <span className="shrink-0 text-[11px]">📁</span>
       <input ref={inputRef} value={value} placeholder={t("sidebar.folderNamePh")}
@@ -1038,6 +1154,81 @@ function NewFolderRow({ depth, value, inputRef, onChange, onCommit, onCancel }: 
       />
     </div>
   );
+}
+
+// ─── Empty-space context menu (right-click sidebar padding / gutter) ───────────
+
+function SidebarEmptySpaceContextMenu({
+  x, y, onClose,
+  onAddStandard, onAddMusic, onAddGamedev, onAddFolder,
+}: {
+  x: number;
+  y: number;
+  onClose: () => void;
+  onAddStandard: () => void;
+  onAddMusic: () => void;
+  onAddGamedev: () => void;
+  onAddFolder: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    const handler = (e: globalThis.MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    const id = window.setTimeout(() => document.addEventListener("mousedown", handler), 0);
+    return () => { window.clearTimeout(id); document.removeEventListener("mousedown", handler); };
+  }, [onClose]);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const pad = 6;
+    let left = x;
+    let top = y;
+    if (left + rect.width > window.innerWidth - pad) {
+      left = Math.max(pad, window.innerWidth - rect.width - pad);
+    }
+    if (top + rect.height > window.innerHeight - pad) {
+      top = Math.max(pad, window.innerHeight - rect.height - pad);
+    }
+    if (left < pad) left = pad;
+    if (top < pad) top = pad;
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }, [x, y]);
+
+  const Row = ({
+    icon: Icon, label, onClick,
+  }: {
+    icon: React.ElementType; label: string; onClick: () => void;
+  }) => (
+    <button type="button" onClick={onClick}
+      className="flex w-full items-center gap-2.5 px-3 py-[5px] text-left font-mono text-[11px] tracking-wide text-zinc-200 transition-colors hover:bg-zinc-900 hover:text-zinc-50">
+      <Icon size={11} className="shrink-0 opacity-70" />
+      {label}
+    </button>
+  );
+
+  const menu = (
+    <div ref={ref}
+      className="fixed z-[9999] w-[220px] border border-zinc-800 bg-zinc-950 py-0.5 font-mono shadow-xl shadow-black/60"
+      style={{ top: y, left: x }}>
+      <p className="px-3 pb-0.5 pt-1 font-mono text-[8px] tracking-wider text-zinc-600">
+        {t("sidebar.ctx.emptySpaceHint")}
+      </p>
+      <Row icon={FileText} label={t("sidebar.ctx.newStandardMemo")} onClick={onAddStandard} />
+      <Row icon={Music2} label={t("sidebar.ctx.newMusicMemo")} onClick={onAddMusic} />
+      <Row icon={Gamepad2} label={t("sidebar.ctx.newGamedevMemo")} onClick={onAddGamedev} />
+      <div className="mx-2 my-0.5 h-px bg-zinc-800/80" />
+      <Row icon={FolderPlus} label={t("sidebar.ctx.newFolder")} onClick={onAddFolder} />
+    </div>
+  );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(menu, document.body);
 }
 
 // ─── Sidebar context menu ─────────────────────────────────────────────────────
@@ -1110,7 +1301,26 @@ function SidebarContextMenu(props: SidebarMenuProps) {
 
   const Divider = () => <div className="mx-2 my-0.5 h-px bg-zinc-800/80" />;
 
-  return (
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const pad = 6;
+    let left = x;
+    let top = y;
+    if (left + rect.width > window.innerWidth - pad) {
+      left = Math.max(pad, window.innerWidth - rect.width - pad);
+    }
+    if (top + rect.height > window.innerHeight - pad) {
+      top = Math.max(pad, window.innerHeight - rect.height - pad);
+    }
+    if (left < pad) left = pad;
+    if (top < pad) top = pad;
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }, [x, y]);
+
+  const menu = (
     <div ref={ref}
       className="fixed z-[9999] w-[220px] border border-zinc-800 bg-zinc-950 py-0.5 font-mono shadow-xl shadow-black/60"
       style={{ top: y, left: x }}>
@@ -1196,6 +1406,9 @@ function SidebarContextMenu(props: SidebarMenuProps) {
       )}
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(menu, document.body);
 }
 
 // ─── Delete confirmation dialog ───────────────────────────────────────────────
