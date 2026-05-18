@@ -7,7 +7,7 @@ import {
 } from "react";
 import {
   FolderPlus, Pencil, Trash2, Download,
-  Star, StarOff, Copy, Archive, Settings, FileText,
+  Star, StarOff, Copy, Archive, Settings, FileText, X,
   Music2, Gamepad2, Music, Smile, Share2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -64,6 +64,7 @@ type Props = {
   onExportFullBackup: () => void;
   onMemoColorSliderUndoGestureStart?: () => void;
   onMemoColorSliderUndoGestureEnd?: () => void;
+  onMobileDrawerClose?: () => void;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -471,6 +472,7 @@ export function FileSidebar({
   onExportFullBackup,
   onMemoColorSliderUndoGestureStart,
   onMemoColorSliderUndoGestureEnd,
+  onMobileDrawerClose,
 }: Props) {
   const { t } = useTranslation();
   const openShareModal = useShareModalStore((s) => s.openShareModal);
@@ -584,12 +586,25 @@ export function FileSidebar({
 
   return (
     <aside
-      className="flex h-full min-h-0 shrink-0 flex-col bg-zinc-950"
-      style={{ width }}
+      className={cn(
+        "flex h-full min-h-0 shrink-0 flex-col bg-zinc-950",
+        onMobileDrawerClose && "w-full min-w-0",
+      )}
+      style={onMobileDrawerClose ? undefined : { width }}
     >
       {/* Header */}
-      <div className="flex items-center border-b border-zinc-800/70 px-3 py-2">
+      <div className="flex items-center justify-between gap-2 border-b border-zinc-800/70 px-3 py-2">
         <span className="font-mono text-[9px] tracking-[3px] text-zinc-600">{t("sidebar.myFiles")}</span>
+        {onMobileDrawerClose && (
+          <button
+            type="button"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-zinc-700/80 bg-zinc-900/60 text-zinc-400 transition-colors hover:border-zinc-500 hover:bg-zinc-800/80 hover:text-zinc-100 md:hidden"
+            aria-label={t("mobile.closeSidebar")}
+            onClick={onMobileDrawerClose}
+          >
+            <X size={15} strokeWidth={2} />
+          </button>
+        )}
       </div>
 
       {/* Scroll area */}

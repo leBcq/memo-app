@@ -188,6 +188,7 @@ const messagesEn = {
 
   "mobile.openSidebar": "Open files",
   "mobile.closeSidebarBackdrop": "Close file list",
+  "mobile.closeSidebar": "Close sidebar",
   "mobile.selectionMode": "Selection mode",
   "mobile.selectionModeHint": "Tap rows to multi-select (like Alt+click)",
   "workflow.memoStatusTitle": "Memo status (DRAFT / WIP / DONE)",
@@ -407,6 +408,7 @@ const messagesJa: Record<MessageId, string> = {
 
   "mobile.openSidebar": "ファイル一覧を開く",
   "mobile.closeSidebarBackdrop": "ファイル一覧を閉じる",
+  "mobile.closeSidebar": "サイドバーを閉じる",
   "mobile.selectionMode": "選択モード",
   "mobile.selectionModeHint": "行をタップして複数選択（Alt+クリック相当）",
   "workflow.memoStatusTitle": "メモ全体のステータス（DRAFT / WIP / DONE）",

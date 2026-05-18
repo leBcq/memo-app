@@ -754,7 +754,7 @@ export default function Home() {
           <button
             type="button"
             aria-label={t("mobile.closeSidebarBackdrop")}
-            className="fixed inset-0 z-[85] bg-black/55 backdrop-blur-[2px] md:hidden"
+            className="fixed inset-0 z-40 bg-black/60 md:hidden"
             onClick={() => setIsSidebarOpen(false)}
           />
         )}
@@ -783,14 +783,15 @@ export default function Home() {
 
         <div
           className={cn(
-            "flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-zinc-800/40 bg-zinc-950 transition-[width,transform] duration-300 ease-out",
-            "fixed inset-y-0 left-0 z-[90] max-w-[min(100vw,600px)] shadow-[4px_0_24px_rgba(0,0,0,0.45)] md:relative md:inset-auto md:z-auto md:max-w-none md:shadow-none",
+            "flex h-full min-h-0 flex-col overflow-hidden border-zinc-800/40 bg-zinc-950 transition-transform duration-300 ease-out",
+            "fixed top-0 left-0 z-50 h-full w-[80vw] max-w-[320px] border-r border-zinc-800/40 shadow-[4px_0_28px_rgba(0,0,0,0.55)]",
+            "md:relative md:top-auto md:left-auto md:z-auto md:h-full md:max-w-none md:w-auto md:shrink-0 md:shadow-none",
             isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-            isSidebarOpen && "border-r border-zinc-800/40",
+            !isSidebarOpen && "max-md:pointer-events-none",
+            isSidebarOpen && isMdUp ? "md:border-r md:border-zinc-800/40" : "",
+            !isSidebarOpen && isMdUp && "md:pointer-events-none md:border-r-0",
           )}
-          style={{
-            width: isMdUp ? (isSidebarOpen ? sidebarWidth : 0) : sidebarWidth,
-          }}
+          style={isMdUp ? { width: isSidebarOpen ? sidebarWidth : 0 } : undefined}
         >
           <FileSidebar
             width={sidebarWidth}
@@ -819,6 +820,7 @@ export default function Home() {
             onExportFullBackup={exportFullBackup}
             onMemoColorSliderUndoGestureStart={beginMemoColorSliderUndoGesture}
             onMemoColorSliderUndoGestureEnd={endMemoColorSliderUndoGesture}
+            onMobileDrawerClose={isMdUp ? undefined : () => setIsSidebarOpen(false)}
           />
         </div>
 
