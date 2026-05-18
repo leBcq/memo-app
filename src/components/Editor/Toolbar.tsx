@@ -257,7 +257,7 @@ export default function Toolbar({
   return (
     <div
       data-geo-editor-toolbar
-      className="sticky top-0 z-50 flex min-w-0 shrink-0 flex-nowrap items-center gap-1 overflow-x-auto border-b border-zinc-800/60 bg-zinc-950/95 px-2 py-1.5 backdrop-blur-sm sm:px-3 md:pl-14"
+      className="sticky top-0 z-50 flex min-w-0 shrink-0 flex-nowrap items-center gap-1 overflow-x-auto border-b border-zinc-800/60 bg-zinc-950/95 px-2 py-1.5 backdrop-blur-sm sm:px-3"
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Undo / Redo */}

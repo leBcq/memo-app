@@ -10,6 +10,7 @@ import { ShareMemoModal } from "@/components/ShareMemoModal";
 import { TrackStatusBar } from "@/components/TrackStatusBar";
 import { GamedevToolbarStrip } from "@/components/GamedevToolbarStrip";
 import { CloudSyncIndicator } from "@/components/CloudSyncIndicator";
+import { PcSidebarToggleButton } from "@/components/PcSidebarToggleButton";
 import { useMemos } from "@/hooks/useMemos";
 import { matchesKeybind } from "@/config/keybinds";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -22,7 +23,7 @@ import {
   EDITOR_STANDARD_TEXT_COLOR,
   EDITOR_STANDARD_CARET_COLOR,
 } from "@/lib/memoThemeColor";
-import { PanelLeft, PanelLeftClose, Menu, MousePointer2, X } from "lucide-react";
+import { Menu, MousePointer2, X } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useMobileUiStore } from "@/stores/mobileUiStore";
 import type { MemoType } from "@/types/memoKind";
@@ -219,6 +220,16 @@ export default function Home() {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     };
+  }, []);
+
+  const togglePcSidebar = useCallback(() => {
+    setIsSidebarOpen((o) => {
+      const next = !o;
+      if (typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches) {
+        localStorage.setItem(SIDEBAR_OPEN_KEY, next ? "1" : "0");
+      }
+      return next;
+    });
   }, []);
 
   const {
@@ -844,27 +855,15 @@ export default function Home() {
         </div>
 
         {/* PC sidebar toggle — never inside the clipped sidebar panel; sibling in the flex row */}
-        <button
-          type="button"
-          aria-expanded={isSidebarOpen}
-          aria-label={isSidebarOpen ? t("app.sidebarHide") : t("app.sidebarShow")}
-          onClick={() => {
-            setIsSidebarOpen((o) => {
-              const next = !o;
-              if (typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches) {
-                localStorage.setItem(SIDEBAR_OPEN_KEY, next ? "1" : "0");
-              }
-              return next;
-            });
-          }}
-          className={cn(
-            "pointer-events-auto absolute top-2 z-[80] hidden h-9 w-9 items-center justify-center rounded-md border border-zinc-700 bg-zinc-950 text-zinc-300 shadow-md transition-[left] duration-300 ease-out hover:border-cyan-500/45 hover:text-cyan-200 md:flex",
-          )}
-          style={{ left: isSidebarOpen ? sidebarWidth + 6 : 10 }}
-          title={isSidebarOpen ? t("app.sidebarHide") : t("app.sidebarShow")}
-        >
-          {isSidebarOpen ? <PanelLeftClose size={18} strokeWidth={1.75} /> : <PanelLeft size={18} strokeWidth={1.75} />}
-        </button>
+        <PcSidebarToggleButton
+          isSidebarOpen={isSidebarOpen}
+          onToggle={togglePcSidebar}
+          leftPx={isSidebarOpen ? sidebarWidth + 6 : 10}
+          ariaLabelShow={t("app.sidebarShow")}
+          ariaLabelHide={t("app.sidebarHide")}
+          titleShow={t("app.sidebarShow")}
+          titleHide={t("app.sidebarHide")}
+        />
 
         {/* Resize handle — desktop only */}
         <div
@@ -910,7 +909,7 @@ export default function Home() {
           {/* Mode strip: music tools or gamedev spec tools (fixed h-9). */}
           <div
             className={cn(
-              "relative z-30 h-9 shrink-0 overflow-visible transition-[border-color,background-color] duration-300 ease-in-out md:pl-14",
+              "relative z-30 h-9 shrink-0 overflow-visible transition-[border-color,background-color] duration-300 ease-in-out",
               (activeMemo.memoType === "music" && activeMemo.musicMeta) || activeMemo.memoType === "gamedev"
                 ? "bg-zinc-950/95"
                 : "border-b border-zinc-800/35 bg-zinc-950",
