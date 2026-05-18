@@ -69,6 +69,8 @@ type ToolbarProps = {
   onGamedevStageChange?: (stage: GamedevStage) => void;
   /** Active memo id (for Share and other memo-scoped actions). */
   activeMemoId: string;
+  /** Shared viewer (or non-editor invitee): disable formatting and status controls. */
+  readOnly?: boolean;
 };
 
 const PRESET_COLORS = ["#a78bfa", "#60dfcd", "#f87171", "#fbbf24", "#e0e0e6"];
@@ -95,6 +97,7 @@ export default function Toolbar({
   gamedevStage,
   onGamedevStageChange,
   activeMemoId,
+  readOnly = false,
 }: ToolbarProps) {
   const { t } = useTranslation();
   const openShareModal = useShareModalStore((s) => s.openShareModal);
@@ -144,8 +147,8 @@ export default function Toolbar({
   );
 
   const canEdit = useMemo(
-    () => Boolean(batchTargetIds) || isEditorActive,
-    [batchTargetIds, isEditorActive],
+    () => !readOnly && (Boolean(batchTargetIds) || isEditorActive),
+    [readOnly, batchTargetIds, isEditorActive],
   );
 
   const commitBatchBodies = useCallback(
@@ -264,7 +267,7 @@ export default function Toolbar({
       <button
         type="button"
         title={t("toolbar.undo")}
-        disabled={!canUndo}
+        disabled={readOnly || !canUndo}
         onClick={onUndo}
         className="flex h-6 w-6 items-center justify-center border border-zinc-700 text-xs text-zinc-200 disabled:opacity-30 hover:enabled:border-zinc-500 hover:enabled:text-zinc-50"
       >
@@ -273,7 +276,7 @@ export default function Toolbar({
       <button
         type="button"
         title={t("toolbar.redo")}
-        disabled={!canRedo}
+        disabled={readOnly || !canRedo}
         onClick={onRedo}
         className="flex h-6 w-6 items-center justify-center border border-zinc-700 text-xs text-zinc-200 disabled:opacity-30 hover:enabled:border-zinc-500 hover:enabled:text-zinc-50"
       >
@@ -330,6 +333,7 @@ export default function Toolbar({
         min={8}
         max={72}
         value={fontSize}
+        disabled={readOnly}
         onChange={(event) => {
           const next = clampSize(Number(event.target.value) || 8);
           setFontSize(next);
@@ -374,6 +378,8 @@ export default function Toolbar({
           type="text"
           maxLength={6}
           value={hexInput}
+          readOnly={readOnly}
+          disabled={readOnly}
           onChange={(event) => {
             const val = event.target.value.replace(/[^0-9a-fA-F]/g, "");
             setHexInput(val);
@@ -417,8 +423,9 @@ export default function Toolbar({
           type="button"
           title={t("toolbar.share")}
           aria-label={t("toolbar.share")}
+          disabled={readOnly}
           onClick={() => openShareModal(activeMemoId)}
-          className="flex h-6 items-center gap-1 border border-zinc-700/90 bg-zinc-900/30 px-2 text-[10px] tracking-wide text-zinc-400 transition-colors hover:border-cyan-500/40 hover:bg-zinc-900/55 hover:text-cyan-200/90"
+          className="flex h-6 items-center gap-1 border border-zinc-700/90 bg-zinc-900/30 px-2 text-[10px] tracking-wide text-zinc-400 transition-colors hover:enabled:border-cyan-500/40 hover:enabled:bg-zinc-900/55 hover:enabled:text-cyan-200/90 disabled:opacity-40"
         >
           <Share2 size={12} strokeWidth={1.75} className="shrink-0 opacity-85" />
           <span className="max-[680px]:hidden">Share</span>
@@ -429,6 +436,7 @@ export default function Toolbar({
           onWorkflowChange={onWorkflowChange}
           gamedevStage={gamedevStage}
           onGamedevStageChange={onGamedevStageChange}
+          disabled={readOnly}
         />
       </div>
     </div>

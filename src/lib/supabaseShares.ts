@@ -30,6 +30,27 @@ export function normalizeShareEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+/** For the signed-in invitee: memo_id → role (from `memo_shares` visible via RLS). */
+export async function fetchInviteeShareRolesByMemoId(
+  client: SupabaseClient,
+  email: string | null | undefined,
+): Promise<Map<string, MemoShareRole>> {
+  const map = new Map<string, MemoShareRole>();
+  if (email == null || typeof email !== "string" || email.trim() === "") return map;
+  const norm = normalizeShareEmail(email);
+  const { data, error } = await client
+    .from("memo_shares")
+    .select("memo_id, role")
+    .eq("shared_with_email", norm);
+  if (error) throw error;
+  for (const row of data ?? []) {
+    const mid = row.memo_id as string;
+    const role = row.role as MemoShareRole;
+    if (role === "viewer" || role === "editor") map.set(mid, role);
+  }
+  return map;
+}
+
 export async function fetchShares(client: SupabaseClient, memoId: string): Promise<MemoShareRow[]> {
   if (memoId == null || typeof memoId !== "string" || memoId.trim() === "") {
     const err = new Error("[fetchShares] memoId is missing or invalid");

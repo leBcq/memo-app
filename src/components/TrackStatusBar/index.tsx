@@ -26,6 +26,8 @@ type TrackStatusBarProps = {
   themeChromeAlphaMult?: number;
   /** Raw sidebar `FileItem.color` borderless badge when alpha is 0 in storage. */
   rowTintSourceColor?: FileItemColor | null;
+  /** Shared viewer: strip is display-only. */
+  readOnly?: boolean;
 };
 
 export function TrackStatusBar({
@@ -36,6 +38,7 @@ export function TrackStatusBar({
   themeColor,
   themeChromeAlphaMult = 1,
   rowTintSourceColor,
+  readOnly = false,
 }: TrackStatusBarProps) {
   const { t } = useTranslation();
   const chrome = themeChromeAlphaMult;
@@ -105,6 +108,7 @@ export function TrackStatusBar({
         "relative z-[100] flex h-9 shrink-0 flex-col",
         "bg-zinc-950/95 font-mono text-[11px]",
         "shadow-[inset_0_1px_0_rgba(6,182,212,0.06)]",
+        readOnly && "pointer-events-none select-none opacity-[0.72]",
       )}
     >
       {anyMenuOpen && (

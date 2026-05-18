@@ -113,6 +113,8 @@ export type NoteNodeProps = {
   onPatchNodeContents: (patches: Record<string, string>) => void;
   /** Supabase public URL for row attachment image (persisted on node). */
   onSetNodeImageUrl: (id: string, url: string | null) => void;
+  /** Shared viewer: disable body / note editing (.images paste still allowed only if false). */
+  editorReadOnly?: boolean;
 };
 
 const getCaretCharOffset = (el: HTMLElement): number => {
@@ -213,6 +215,7 @@ export default function NoteNode({
   onMemoColorSliderUndoGestureEnd,
   onPatchNodeContents,
   onSetNodeImageUrl,
+  editorReadOnly = false,
 }: NoteNodeProps) {
   const chrome = themeChromeAlphaMult;
   const hideThemedChrome = isThemeChromeInvisible(chrome);
@@ -370,6 +373,7 @@ export default function NoteNode({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (isComposingRef.current) return;
+    if (editorReadOnly) return;
 
     if (e.key === "Backspace") {
       const el = editorRef.current;
@@ -500,8 +504,12 @@ export default function NoteNode({
           >
             <button
               type="button"
-              onClick={() => (menuOpen ? closeMenu() : openMenu())}
-              className="flex h-6 w-6 items-center justify-center text-sm text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200 active:scale-90"
+              disabled={editorReadOnly}
+              onClick={() => {
+                if (editorReadOnly) return;
+                menuOpen ? closeMenu() : openMenu();
+              }}
+              className="flex h-6 w-6 items-center justify-center text-sm text-zinc-500 transition-colors hover:enabled:bg-zinc-800 hover:enabled:text-zinc-200 active:enabled:scale-90 disabled:opacity-30"
               aria-label="ノードメニュー"
             >
               ⋮
@@ -519,7 +527,7 @@ export default function NoteNode({
             )}
             style={{ backgroundColor: node.bgColor ?? undefined }}
             onDragOver={
-              !isPluginCard && !isGameSpecCard && !isSelectionMode
+              !isPluginCard && !isGameSpecCard && !isSelectionMode && !editorReadOnly
                 ? (e) => {
                     if (!Array.from(e.dataTransfer.types).includes("Files")) return;
                     e.preventDefault();
@@ -528,7 +536,7 @@ export default function NoteNode({
                 : undefined
             }
             onDrop={
-              !isPluginCard && !isGameSpecCard && !isSelectionMode
+              !isPluginCard && !isGameSpecCard && !isSelectionMode && !editorReadOnly
                 ? (e) => {
                     e.preventDefault();
                     const file = Array.from(e.dataTransfer.files).find((f) =>
@@ -608,6 +616,7 @@ export default function NoteNode({
                 className="min-w-0 flex-1"
                 onFocusCapture={() => onActive(node.id, null)}
                 onContextMenu={(e) => {
+                  if (editorReadOnly) return;
                   e.preventDefault();
                   openMenuAtPointer(e.clientX, e.clientY);
                 }}
@@ -617,6 +626,7 @@ export default function NoteNode({
                   keybinds={KEYBINDS}
                   accentColor={solidAccent}
                   chromeAlphaMult={chrome}
+                  readOnly={editorReadOnly}
                   onPatch={(patch, mode) => onPatchPluginData(node.id, patch, mode)}
                   onAddSibling={() => onAddSibling(node.id)}
                   onIndent={() => {
@@ -645,6 +655,7 @@ export default function NoteNode({
                 className="min-w-0 flex-1"
                 onFocusCapture={() => onActive(node.id, null)}
                 onContextMenu={(e) => {
+                  if (editorReadOnly) return;
                   e.preventDefault();
                   openMenuAtPointer(e.clientX, e.clientY);
                 }}
@@ -653,6 +664,7 @@ export default function NoteNode({
                   node={node as NoteNodeType & { gameData: NoteGameData }}
                   keybinds={KEYBINDS}
                   accentColor={solidAccent}
+                  readOnly={editorReadOnly}
                   chromeAlphaMult={chrome}
                   onPatch={(patch, mode) => onPatchGameData(node.id, patch, mode)}
                   onAddSibling={() => onAddSibling(node.id)}
@@ -680,7 +692,7 @@ export default function NoteNode({
             ) : (
             <div
               ref={editorRef}
-              contentEditable={!isSelectionMode}
+              contentEditable={!isSelectionMode && !editorReadOnly}
               suppressContentEditableWarning
               data-node-id={node.id}
               data-geo-editor="body"
@@ -729,10 +741,12 @@ export default function NoteNode({
                 }
               }}
               onContextMenu={(e) => {
+                if (editorReadOnly) return;
                 e.preventDefault();
                 openMenuAtPointer(e.clientX, e.clientY);
               }}
               onPaste={(event) => {
+                if (editorReadOnly) return;
                 const editor = editorRef.current;
                 if (!editor) return;
 
@@ -846,7 +860,7 @@ export default function NoteNode({
         >
           <div
             ref={noteRef}
-            contentEditable={!isSelectionMode}
+            contentEditable={!isSelectionMode && !editorReadOnly}
             suppressContentEditableWarning
             aria-label="ノート"
             className={cn(
@@ -919,6 +933,7 @@ export default function NoteNode({
                   selectedIds={selectedIds}
                   ancestorCoversSelection={childAncestorCovers}
                   isSelectionMode={isSelectionMode}
+                  editorReadOnly={editorReadOnly}
                   onSelectStart={onSelectStart}
                   onMobileSelectNode={onMobileSelectNode}
                   memoType={memoType}

@@ -122,9 +122,9 @@ const WORKFLOW_LABEL_SHORT: Record<MemoWorkflowStatus, string> = {
  * One status control for the top toolbar (DRAFT / WIP / DONE for every memo kind).
  */
 export function ToolbarUnifiedMemoStatusControl(
-  props: UnifiedMemoStatusMenuProps & { panelZClass?: string },
+  props: UnifiedMemoStatusMenuProps & { panelZClass?: string; disabled?: boolean },
 ) {
-  const { workflowStatus, panelZClass = "z-[200]" } = props;
+  const { workflowStatus, panelZClass = "z-[200]", disabled = false } = props;
   const { t } = useTranslation();
 
   const [open, setOpen] = useState(false);
@@ -148,12 +148,14 @@ export function ToolbarUnifiedMemoStatusControl(
     <div ref={rootRef} className="relative flex items-center">
       <button
         type="button"
+        disabled={disabled}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
+          if (disabled) return;
           setOpen((v) => !v);
         }}
-        className="flex h-6 max-w-[140px] items-center gap-1.5 border border-zinc-700 bg-zinc-900/30 px-2 text-[10px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100"
+        className="flex h-6 max-w-[140px] items-center gap-1.5 border border-zinc-700 bg-zinc-900/30 px-2 text-[10px] text-zinc-300 transition-colors hover:enabled:border-zinc-500 hover:enabled:text-zinc-100 disabled:opacity-40"
         title={t("workflow.memoStatusTitle")}
       >
         <span

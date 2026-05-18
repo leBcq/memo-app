@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FileItem } from "@/types/fileSystem";
+import { SHARED_WITH_ME_SIDEBAR_PARENT_ID } from "@/types/fileSystem";
 import type { Memo } from "@/types/memoApp";
 import type { NoteNode } from "@/types/note";
 import { normalizeMemoType } from "@/types/memoKind";
@@ -13,7 +14,6 @@ import { normalizeMemoWorkflowStatus, type MemoWorkflowStatus } from "@/types/me
 import { normalizeNode, cloneNoteTreeForPersistence } from "@/types/note";
 import { normalizeHexColorOrNull, fileItemColorToMemoThemeHex } from "@/lib/memoThemeColor";
 import { normalizeFileItemStoredColor } from "@/lib/fileItemLabelStyles";
-import { normalizeShareEmail } from "@/lib/supabaseShares";
 
 export type MemoDbRow = {
   id: string;
@@ -127,19 +127,25 @@ export function memoRowToMemo(row: MemoDbRow): Memo {
     nodes: parsed.nodes,
     updatedAt:
       typeof row.updated_at === "string" ? row.updated_at : new Date().toISOString(),
+    ownerUserId: row.user_id,
   };
 }
 
-export function fileItemFromRow(memo: Memo, row: MemoDbRow): FileItem {
+export function fileItemFromRow(
+  memo: Memo,
+  row: MemoDbRow,
+  opts?: { sharedWithMe?: boolean; sharedOrder?: number },
+): FileItem {
   const parsed = parseContentV1(row.content);
   const sb = parsed.sidebar;
+  const sharedWithMe = Boolean(opts?.sharedWithMe);
   const it: FileItem = {
     id: memo.id,
     type: "memo",
     name: memo.title,
-    parentId: sb?.parentId ?? null,
+    parentId: sharedWithMe ? SHARED_WITH_ME_SIDEBAR_PARENT_ID : (sb?.parentId ?? null),
     isOpen: false,
-    order: sb?.order ?? 0,
+    order: sharedWithMe ? 1000 + (opts?.sharedOrder ?? 0) : (sb?.order ?? 0),
     memoType: memo.memoType,
   };
   if (sb?.icon) it.icon = sb.icon;
@@ -182,53 +188,64 @@ export function cloudMemoFingerprint(m: Memo, fileItem: FileItem | undefined): s
   });
 }
 
+/** Pin non-owned memos under {@link SHARED_WITH_ME_SIDEBAR_PARENT_ID} so invitees see shares even when the owner's folder is absent locally. */
+export function normalizeSharedMemoSidebarPlacement(
+  items: FileItem[],
+  memos: Memo[],
+  currentUserId: string,
+): FileItem[] {
+  const memoById = new Map(memos.map((m) => [m.id, m]));
+  const folderIds = new Set(items.filter((i) => i.type === "folder").map((i) => i.id));
+
+  let nextSharedOrder =
+    items
+      .filter((i) => i.type === "memo" && i.parentId === SHARED_WITH_ME_SIDEBAR_PARENT_ID)
+      .reduce((max, i) => Math.max(max, i.order), 999) + 1;
+
+  let changed = false;
+  const out = items.map((it) => {
+    if (it.type !== "memo") return it;
+    const m = memoById.get(it.id);
+    const owned = !m?.ownerUserId || m.ownerUserId === currentUserId;
+
+    if (owned) {
+      if (
+        it.parentId != null &&
+        it.parentId !== SHARED_WITH_ME_SIDEBAR_PARENT_ID &&
+        !folderIds.has(it.parentId)
+      ) {
+        changed = true;
+        return { ...it, parentId: null };
+      }
+      return it;
+    }
+
+    if (it.parentId !== SHARED_WITH_ME_SIDEBAR_PARENT_ID) {
+      changed = true;
+      return {
+        ...it,
+        parentId: SHARED_WITH_ME_SIDEBAR_PARENT_ID,
+        order: nextSharedOrder++,
+      };
+    }
+    return it;
+  });
+
+  return changed ? out : items;
+}
+
+/** All rows visible to the session user (RLS). Do not filter by `user_id` here. */
 export async function fetchUserMemos(
   client: SupabaseClient,
-  userId: string,
-  inviteEmail?: string | null,
+  _userId?: string,
+  _inviteEmail?: string | null,
 ): Promise<MemoDbRow[]> {
-  const { data: owned, error: e1 } = await client
+  const { data, error } = await client
     .from("memos")
     .select("id,user_id,title,content,theme_color,created_at,updated_at")
-    .eq("user_id", userId)
     .order("updated_at", { ascending: false });
-  if (e1) throw e1;
-
-  const rows: MemoDbRow[] = [...((owned ?? []) as MemoDbRow[])];
-  const seen = new Set(rows.map((r) => r.id));
-
-  const norm =
-    typeof inviteEmail === "string" && inviteEmail.trim().length > 0
-      ? normalizeShareEmail(inviteEmail)
-      : "";
-  if (norm.length > 0) {
-    const { data: sh, error: e2 } = await client
-      .from("memo_shares")
-      .select("memo_id")
-      .eq("shared_with_email", norm);
-    if (e2) throw e2;
-    const ids = [...new Set((sh ?? []).map((r: { memo_id: string }) => r.memo_id))];
-    if (ids.length > 0) {
-      const { data: sharedRows, error: e3 } = await client
-        .from("memos")
-        .select("id,user_id,title,content,theme_color,created_at,updated_at")
-        .in("id", ids);
-      if (e3) throw e3;
-      for (const r of (sharedRows ?? []) as MemoDbRow[]) {
-        if (!seen.has(r.id)) {
-          seen.add(r.id);
-          rows.push(r);
-        }
-      }
-    }
-  }
-
-  rows.sort((a, b) => {
-    const ta = typeof a.updated_at === "string" ? a.updated_at : "";
-    const tb = typeof b.updated_at === "string" ? b.updated_at : "";
-    return tb.localeCompare(ta);
-  });
-  return rows;
+  if (error) throw error;
+  return (data ?? []) as MemoDbRow[];
 }
 
 export async function insertMemoRow(

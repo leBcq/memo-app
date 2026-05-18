@@ -81,6 +81,7 @@ const messagesEn = {
   // Sidebar
   "sidebar.myFiles": "MY FILES",
   "sidebar.favorites": "FAVORITES",
+  "sidebar.sharedWithMe": "SHARED WITH ME",
   "sidebar.standardMemo": "Standard Memo",
   "sidebar.musicMemo": "Music Memo",
   "sidebar.gamedevMemo": "Game dev Memo",
@@ -318,6 +319,7 @@ const messagesJa: Record<MessageId, string> = {
 
   "sidebar.myFiles": "マイファイル",
   "sidebar.favorites": "お気に入り",
+  "sidebar.sharedWithMe": "共有されたメモ",
   "sidebar.standardMemo": "標準メモ",
   "sidebar.musicMemo": "音楽メモ",
   "sidebar.gamedevMemo": "ゲーム開発メモ",

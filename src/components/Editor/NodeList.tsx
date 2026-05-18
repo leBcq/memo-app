@@ -40,6 +40,8 @@ type NodeListProps = {
   onMemoColorSliderUndoGestureEnd?: () => void;
   onPatchNodeContents: (patches: Record<string, string>) => void;
   onSetNodeImageUrl: (id: string, url: string | null) => void;
+  /** Shared viewer: disable editing in all nodes. */
+  editorReadOnly?: boolean;
 };
 
 export default function NodeList({
@@ -76,6 +78,7 @@ export default function NodeList({
   onMemoColorSliderUndoGestureEnd,
   onPatchNodeContents,
   onSetNodeImageUrl,
+  editorReadOnly = false,
 }: NodeListProps) {
   return (
     <div className="space-y-2">
@@ -116,6 +119,7 @@ export default function NodeList({
           onMemoColorSliderUndoGestureEnd={onMemoColorSliderUndoGestureEnd}
           onPatchNodeContents={onPatchNodeContents}
           onSetNodeImageUrl={onSetNodeImageUrl}
+          editorReadOnly={editorReadOnly}
         />
       ))}
     </div>

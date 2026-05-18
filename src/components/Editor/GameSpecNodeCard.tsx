@@ -24,6 +24,7 @@ type Props = {
   onIndent: () => void;
   onUnindent: () => void;
   onDeleteEmpty: () => void;
+  readOnly?: boolean;
 };
 
 export function GameSpecNodeCard({
@@ -36,6 +37,7 @@ export function GameSpecNodeCard({
   onIndent,
   onUnindent,
   onDeleteEmpty,
+  readOnly = false,
 }: Props) {
   const { t } = useTranslation();
   const g = node.gameData;
@@ -52,6 +54,7 @@ export function GameSpecNodeCard({
   };
 
   const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (readOnly) return;
     if (matchesKeybind(e, keybinds.ADD_SIBLING)) {
       e.preventDefault();
       onAddSibling();
@@ -121,10 +124,11 @@ export function GameSpecNodeCard({
             type="text"
             data-card-focus-target="name"
             value={g.name}
+            readOnly={readOnly}
             onChange={(e) => onPatch({ name: e.target.value })}
             onKeyDown={handleNameKeyDown}
             placeholder={t("spec.namePh")}
-            className="w-full border border-zinc-700/70 bg-zinc-950/50 px-2 py-1 font-mono text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-amber-600/45 focus:ring-1 focus:ring-amber-500/18"
+            className="w-full border border-zinc-700/70 bg-zinc-950/50 px-2 py-1 font-mono text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-amber-600/45 focus:ring-1 focus:ring-amber-500/18 read-only:cursor-default read-only:opacity-90"
           />
         </label>
 
@@ -132,8 +136,9 @@ export function GameSpecNodeCard({
           <span className={SPEC_CARD_LABEL_CLASS}>{t("spec.labelCategory")}</span>
           <select
             value={g.category}
+            disabled={readOnly}
             onChange={(e) => onPatch({ category: e.target.value }, "immediate")}
-            className="w-full max-w-xs cursor-pointer border border-zinc-700/70 bg-zinc-950/50 px-2 py-1 font-mono text-xs text-zinc-200 outline-none focus:border-amber-600/45 focus:ring-1 focus:ring-amber-500/18"
+            className="w-full max-w-xs cursor-pointer border border-zinc-700/70 bg-zinc-950/50 px-2 py-1 font-mono text-xs text-zinc-200 outline-none focus:border-amber-600/45 focus:ring-1 focus:ring-amber-500/18 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {!GAME_SPEC_CATEGORIES.includes(g.category as (typeof GAME_SPEC_CATEGORIES)[number]) && (
               <option value={g.category}>{g.category}</option>
@@ -151,9 +156,10 @@ export function GameSpecNodeCard({
           <input
             type="text"
             value={g.stats}
+            readOnly={readOnly}
             onChange={(e) => onPatch({ stats: e.target.value })}
             placeholder={t("spec.statsPh")}
-            className="w-full border border-zinc-700/70 bg-zinc-950/50 px-2 py-1 font-mono text-xs text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-cyan-600/35 focus:ring-1 focus:ring-cyan-500/15"
+            className="w-full border border-zinc-700/70 bg-zinc-950/50 px-2 py-1 font-mono text-xs text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-cyan-600/35 focus:ring-1 focus:ring-cyan-500/15 read-only:cursor-default read-only:opacity-90"
           />
         </label>
 
@@ -161,10 +167,11 @@ export function GameSpecNodeCard({
           <span className={SPEC_CARD_LABEL_CLASS}>{t("spec.labelDescription")}</span>
           <textarea
             value={g.description}
+            readOnly={readOnly}
             onChange={(e) => onPatch({ description: e.target.value })}
             placeholder={t("spec.descPh")}
             rows={3}
-            className="w-full resize-y border border-zinc-700/70 bg-zinc-950/50 px-2 py-1 font-mono text-xs leading-relaxed text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-violet-600/35 focus:ring-1 focus:ring-violet-500/15"
+            className="w-full resize-y border border-zinc-700/70 bg-zinc-950/50 px-2 py-1 font-mono text-xs leading-relaxed text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-violet-600/35 focus:ring-1 focus:ring-violet-500/15 read-only:cursor-default read-only:opacity-90"
           />
         </label>
       </div>

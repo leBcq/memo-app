@@ -18,6 +18,7 @@ type Props = {
   themeChromeAlphaMult?: number;
   /** Raw sidebar `FileItem.color` — forces borderless badge when alpha is 0 in storage. */
   rowTintSourceColor?: FileItemColor | null;
+  readOnly?: boolean;
 };
 
 /** Thin toolbar row for gamedev memos (mirrors music strip height / chrome). */
@@ -26,6 +27,7 @@ export function GamedevToolbarStrip({
   themeColor,
   themeChromeAlphaMult = 1,
   rowTintSourceColor,
+  readOnly = false,
 }: Props) {
   const { t } = useTranslation();
   const chrome = themeChromeAlphaMult;
@@ -38,6 +40,7 @@ export function GamedevToolbarStrip({
         "relative z-[100] flex h-9 shrink-0 items-stretch",
         "bg-zinc-950/95 font-mono text-[11px]",
         "shadow-[inset_0_1px_0_rgba(6,182,212,0.06)]",
+        readOnly && "pointer-events-none select-none opacity-[0.72]",
       )}
     >
       <div

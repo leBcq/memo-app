@@ -12,6 +12,7 @@ import { GamedevToolbarStrip } from "@/components/GamedevToolbarStrip";
 import { CloudSyncIndicator } from "@/components/CloudSyncIndicator";
 import { PcSidebarToggleButton } from "@/components/PcSidebarToggleButton";
 import { useMemos } from "@/hooks/useMemos";
+import { useAuth } from "@/contexts/AuthContext";
 import { matchesKeybind } from "@/config/keybinds";
 import { useSettings } from "@/contexts/SettingsContext";
 import { findNodePath } from "@/lib/treeUtils";
@@ -302,7 +303,10 @@ export default function Home() {
     setMemoWorkflowStatus,
     patchActiveGamedevMeta,
     cloudSync,
+    activeMemoReadOnly,
   } = useMemos();
+
+  const { user } = useAuth();
 
   const handleSetBgColor = useCallback(
     (id: string, color: string | null, opts?: { skipHistory?: boolean }) => {
@@ -612,6 +616,7 @@ export default function Home() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (selectedIds.length === 0 || commandPaletteOpen || settingsOpen) return;
+      if (activeMemoReadOnly) return;
       if (!matchesKeybind(e, settings.keymap.INDENT) && !matchesKeybind(e, settings.keymap.UNINDENT)) {
         return;
       }
@@ -643,6 +648,7 @@ export default function Home() {
     handleBulkUnindent,
     commandPaletteOpen,
     settingsOpen,
+    activeMemoReadOnly,
   ]);
 
   useEffect(() => {
@@ -824,6 +830,7 @@ export default function Home() {
             : undefined
         }
         activeMemoId={activeMemoId}
+        readOnly={activeMemoReadOnly}
       />
 
       <ShareMemoModal fileItems={fileItems} />
@@ -854,6 +861,7 @@ export default function Home() {
               width={sidebarWidth}
               fileItems={fileItems}
               memos={memos}
+              currentUserId={user?.id ?? null}
               activeMemoId={activeMemoId}
               onSelectMemo={(id) => {
                 switchMemo(id);
@@ -968,6 +976,7 @@ export default function Home() {
                 themeColor={memoThemeColor}
                 themeChromeAlphaMult={themeChromeAlphaMult}
                 rowTintSourceColor={activeMemoFileItem?.color}
+                readOnly={activeMemoReadOnly}
               />
             ) : activeMemo.memoType === "gamedev" ? (
               <GamedevToolbarStrip
@@ -975,6 +984,7 @@ export default function Home() {
                 themeColor={memoThemeColor}
                 themeChromeAlphaMult={themeChromeAlphaMult}
                 rowTintSourceColor={activeMemoFileItem?.color}
+                readOnly={activeMemoReadOnly}
               />
             ) : (
               <div className="h-9 w-full" aria-hidden />
@@ -1051,7 +1061,7 @@ export default function Home() {
                 ) : (
                 <div
                   ref={focusedHeaderRef}
-                  contentEditable={!effectiveSelectionMode}
+                  contentEditable={!effectiveSelectionMode && !activeMemoReadOnly}
                   suppressContentEditableWarning
                   data-geo-editor="focus-title"
                   data-ph={t("app.focusNodeTitlePh")}
@@ -1078,7 +1088,7 @@ export default function Home() {
                 ref={titleRef}
                 type="text"
                 value={activeMemo.title}
-                readOnly={effectiveSelectionMode}
+                readOnly={effectiveSelectionMode || activeMemoReadOnly}
                 onChange={(e) => updateMemoTitle(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
@@ -1152,6 +1162,7 @@ export default function Home() {
                 onFocusNode={handleFocusNode}
                 selectedIds={selectedIds}
                 isSelectionMode={effectiveSelectionMode}
+                editorReadOnly={activeMemoReadOnly}
                 onSelectStart={handleBlockSelectMouseDown}
                 onMobileSelectNode={handleMobileSelectNode}
                 onPatchPluginData={patchNodePluginData}

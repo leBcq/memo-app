@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import {
   findNodePath,
   mapTree,
@@ -20,6 +20,7 @@ import {
 } from "@/types/note";
 import type { FileItem, FileItemColor, FileItemLabelColor } from "@/types/fileSystem";
 import type { Memo } from "@/types/memoApp";
+import { isMemoReadOnlyForCurrentUser } from "@/types/memoApp";
 import { normalizeMemoWorkflowStatus, type MemoWorkflowStatus } from "@/types/memoWorkflow";
 import { normalizeFileItemStoredColor } from "@/lib/fileItemLabelStyles";
 import type { MemoMusicMeta, MemoGamedevMeta, MemoType } from "@/types/memoKind";
@@ -64,6 +65,7 @@ import {
   deleteMemoRow,
   memoRowToMemo,
   fileItemFromRow,
+  normalizeSharedMemoSidebarPlacement,
   cloudMemoFingerprint,
   cloudFoldersFingerprint,
   replaceUserFolders,
@@ -72,6 +74,7 @@ import {
   newMemoUuid,
   isUuid,
 } from "@/lib/supabaseMemos";
+import { fetchInviteeShareRolesByMemoId } from "@/lib/supabaseShares";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
@@ -250,6 +253,9 @@ function normalizeMemo(raw: Partial<Memo> & { nodes?: unknown }): Memo {
       ? raw.nodes.map((n) => normalizeNode(n as Partial<NoteNode> & { children?: unknown }))
       : [],
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
+    ownerUserId: typeof raw.ownerUserId === "string" ? raw.ownerUserId : undefined,
+    shareRole:
+      raw.shareRole === "viewer" || raw.shareRole === "editor" ? raw.shareRole : undefined,
   };
 }
 
@@ -399,6 +405,9 @@ export function useMemos() {
   const fileItemsRef = useRef(fileItems);
   fileItemsRef.current = fileItems;
 
+  /** Stable while memo ids / owners unchanged — avoids re-pinning on every body edit. */
+  const sharePlacementOwnerKey = memos.map((m) => `${m.id}:${m.ownerUserId ?? ""}`).join("|");
+
   // ── History (full memo workspace: nodes, theme, meta, linked FileItem row) ──
   const historyRef = useRef<Map<string, HistoryStack<MemoWorkspaceSnapshot<Memo>>>>(new Map());
   const [canUndo, setCanUndo] = useState(false);
@@ -512,6 +521,14 @@ export function useMemos() {
     localStorage.setItem(FS_KEY, JSON.stringify(fileItemsRef.current));
   }, [fileItems, isHydrated]);
 
+  // Pin invitee shared memos under "Shared with me" / lift owned orphans to root
+  useEffect(() => {
+    if (!isHydrated || !user?.id) return;
+    setFileItems((prev) =>
+      normalizeSharedMemoSidebarPlacement(prev, memosRef.current, user.id),
+    );
+  }, [isHydrated, user?.id, sharePlacementOwnerKey]);
+
   // ── Supabase: pull on login, push new account data once, then debounced saves ─
   useEffect(() => {
     if (!isHydrated || !configured || authLoading) return;
@@ -536,8 +553,24 @@ export function useMemos() {
         if (cancelled) return;
 
         if (rows.length > 0) {
-          const memosFromCloud = rows.map((r) => memoRowToMemo(r));
-          const itemsFromCloud = rows.map((r, i) => fileItemFromRow(memosFromCloud[i]!, r));
+          const roleMap = await fetchInviteeShareRolesByMemoId(client, user.email ?? null);
+          let sharedOrder = 0;
+          const memosFromCloud = rows.map((r) => {
+            const base = memoRowToMemo(r);
+            const isOwned = r.user_id === user.id;
+            return {
+              ...base,
+              shareRole: isOwned ? undefined : (roleMap.get(r.id) ?? "viewer"),
+            };
+          });
+          console.log("Fetched memos:", memosFromCloud);
+          const itemsFromCloud = rows.map((r, i) => {
+            const isShared = r.user_id !== user.id;
+            return fileItemFromRow(memosFromCloud[i]!, r, {
+              sharedWithMe: isShared,
+              sharedOrder: isShared ? sharedOrder++ : undefined,
+            });
+          });
 
           let foldersFromCloud: FileItem[] = [];
           try {
@@ -551,7 +584,11 @@ export function useMemos() {
           const folderItems =
             foldersFromCloud.length > 0 ? foldersFromCloud : localFolderItems;
 
-          const mergedFileItems = [...folderItems, ...itemsFromCloud];
+          const mergedFileItems = normalizeSharedMemoSidebarPlacement(
+            [...folderItems, ...itemsFromCloud],
+            memosFromCloud,
+            user.id,
+          );
 
           lastCloudFingerprintRef.current.clear();
           for (const m of memosFromCloud) {
@@ -619,6 +656,7 @@ export function useMemos() {
         try {
           for (const m of memosRef.current) {
             if (!isUuid(m.id)) continue;
+            if (isMemoReadOnlyForCurrentUser(m, user.id)) continue;
             const it = fileItemsRef.current.find((i) => i.id === m.id && i.type === "memo");
             const fp = cloudMemoFingerprint(m, it);
             if (lastCloudFingerprintRef.current.get(m.id) === fp) continue;
@@ -655,6 +693,10 @@ export function useMemos() {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const activeMemo = memos.find((m) => m.id === activeMemoId) ?? memos[0];
+  const activeMemoReadOnly = useMemo(
+    () => isMemoReadOnlyForCurrentUser(activeMemo, user?.id ?? null),
+    [activeMemo, user?.id],
+  );
 
   const focusNode = useCallback((nodeId: string) => {
     const root = document.querySelector<HTMLElement>(`[data-node-id="${nodeId}"]`);
@@ -694,6 +736,7 @@ export function useMemos() {
     const id = activeMemoIdRef.current;
     const m = memosRef.current.find((x) => x.id === id);
     if (!m || m.nodes.length > 0) return;
+    if (isMemoReadOnlyForCurrentUser(m, user?.id ?? null)) return;
     const filler = createNode();
     setMemos((prev) =>
       prev.map((mm) =>
@@ -701,7 +744,7 @@ export function useMemos() {
       ),
     );
     focusNodeAfterCommit(filler.id);
-  }, [isHydrated, activeMemoId, memos, focusNodeAfterCommit]);
+  }, [isHydrated, activeMemoId, memos, focusNodeAfterCommit, user?.id]);
 
   const nextOrder = useCallback((parentId: string | null) => {
     const siblings = fileItemsRef.current.filter((i) => i.parentId === parentId);
@@ -1731,6 +1774,7 @@ export function useMemos() {
         try {
           for (const m of memosNext) {
             if (!isUuid(m.id)) continue;
+            if (isMemoReadOnlyForCurrentUser(m, user.id)) continue;
             const it = fileItemsNext.find((i) => i.id === m.id && i.type === "memo");
             await upsertMemoRow(client, user.id, m, it);
             lastCloudFingerprintRef.current.set(m.id, cloudMemoFingerprint(m, it));
@@ -1766,6 +1810,7 @@ export function useMemos() {
     memos,
     activeMemoId,
     activeMemo,
+    activeMemoReadOnly,
     switchMemo,
     addMemo,
     setMemoType,

@@ -1,6 +1,9 @@
 import type { MemoType } from "@/types/memoKind";
 import type { MemoWorkflowStatus } from "@/types/memoWorkflow";
 
+/** Virtual sidebar parent: memos shared with the current user (not a real folder row). */
+export const SHARED_WITH_ME_SIDEBAR_PARENT_ID = "__freavia_shared_with_me__";
+
 export type FileItemLabelColor =
   | "default"
   | "red"

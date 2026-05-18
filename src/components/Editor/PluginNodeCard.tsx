@@ -27,6 +27,7 @@ type PluginNodeCardProps = {
   onIndent: () => void;
   onUnindent: () => void;
   onDeleteEmpty: () => void;
+  readOnly?: boolean;
 };
 
 export function PluginNodeCard({
@@ -39,6 +40,7 @@ export function PluginNodeCard({
   onIndent,
   onUnindent,
   onDeleteEmpty,
+  readOnly = false,
 }: PluginNodeCardProps) {
   const { t } = useTranslation();
   const p = node.pluginData;
@@ -54,6 +56,7 @@ export function PluginNodeCard({
   };
 
   const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (readOnly) return;
     if (matchesKeybind(e, keybinds.ADD_SIBLING)) {
       e.preventDefault();
       onAddSibling();
@@ -101,10 +104,11 @@ export function PluginNodeCard({
               type="text"
               data-card-focus-target="name"
               value={p.name}
+              readOnly={readOnly}
               onChange={(e) => onPatch({ name: e.target.value })}
               onKeyDown={handleNameKeyDown}
               placeholder={t("plugin.namePh")}
-              className="w-full border border-zinc-700/70 bg-zinc-950/40 px-2 py-1 font-mono text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-cyan-600/40 focus:ring-1 focus:ring-cyan-500/20"
+              className="w-full border border-zinc-700/70 bg-zinc-950/40 px-2 py-1 font-mono text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-cyan-600/40 focus:ring-1 focus:ring-cyan-500/20 read-only:cursor-default read-only:opacity-90"
             />
           </label>
 
@@ -113,8 +117,9 @@ export function PluginNodeCard({
               <span className={SPEC_CARD_LABEL_CLASS}>{t("plugin.labelCategory")}</span>
               <select
                 value={p.category}
+                disabled={readOnly}
                 onChange={(e) => onPatch({ category: e.target.value }, "immediate")}
-                className="w-full cursor-pointer border border-zinc-700/70 bg-zinc-950/40 px-2 py-1 font-mono text-xs text-zinc-200 outline-none focus:border-fuchsia-600/40 focus:ring-1 focus:ring-fuchsia-500/20"
+                className="w-full cursor-pointer border border-zinc-700/70 bg-zinc-950/40 px-2 py-1 font-mono text-xs text-zinc-200 outline-none focus:border-fuchsia-600/40 focus:ring-1 focus:ring-fuchsia-500/20 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {!PLUGIN_CATEGORIES.includes(p.category as (typeof PLUGIN_CATEGORIES)[number]) && (
                   <option value={p.category}>{p.category}</option>
@@ -130,9 +135,11 @@ export function PluginNodeCard({
             <button
               type="button"
               title={p.isFavorite ? t("plugin.favoriteRemove") : t("plugin.favoriteAdd")}
+              disabled={readOnly}
               onClick={() => onPatch({ isFavorite: !p.isFavorite }, "immediate")}
               className={cn(
                 "mt-5 flex h-8 w-8 shrink-0 items-center justify-center rounded border transition-all",
+                "disabled:opacity-40",
                 p.isFavorite
                   ? "border-amber-400/50 bg-amber-950/35 text-amber-300 shadow-[0_0_14px_rgba(251,191,36,0.45),inset_0_0_12px_rgba(167,139,250,0.12)]"
                   : "border-zinc-700/80 bg-zinc-900/40 text-zinc-600 hover:border-zinc-600 hover:text-zinc-400",
@@ -151,10 +158,11 @@ export function PluginNodeCard({
             <span className={SPEC_CARD_LABEL_CLASS}>{t("plugin.labelPurpose")}</span>
             <textarea
               value={p.purpose}
+              readOnly={readOnly}
               onChange={(e) => onPatch({ purpose: e.target.value })}
               placeholder={t("plugin.purposePh")}
               rows={2}
-              className="w-full resize-y border border-zinc-700/70 bg-zinc-950/40 px-2 py-1 font-mono text-xs leading-relaxed text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-violet-600/35 focus:ring-1 focus:ring-violet-500/15"
+              className="w-full resize-y border border-zinc-700/70 bg-zinc-950/40 px-2 py-1 font-mono text-xs leading-relaxed text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-violet-600/35 focus:ring-1 focus:ring-violet-500/15 read-only:cursor-default read-only:opacity-90"
             />
           </label>
         </div>

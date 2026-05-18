@@ -9,7 +9,7 @@ import { createPortal } from "react-dom";
 import {
   FolderPlus, Pencil, Trash2, Download, Upload,
   Star, StarOff, Copy, Archive, Settings, FileText,
-  Music2, Gamepad2, Music, Smile, Share2,
+  Music2, Gamepad2, Music, Smile, Share2, Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/i18n/useTranslation";
@@ -17,6 +17,7 @@ import { useShareModalStore } from "@/stores/shareModalStore";
 import { useSidebarFileSelectionStore } from "@/stores/sidebarFileSelectionStore";
 import { getMemoThemeColor, hexToRgba } from "@/lib/memoThemeColor";
 import type { FileItem, FileItemColor, FileItemLabelPreset } from "@/types/fileSystem";
+import { SHARED_WITH_ME_SIDEBAR_PARENT_ID } from "@/types/fileSystem";
 import type { MemoType } from "@/types/memoKind";
 import type { Memo } from "@/hooks/useMemos";
 import { adjustStoredColorAlpha, parseStoredColor } from "@/lib/menuColorUtils";
@@ -99,7 +100,7 @@ function computeDragPayloadIds(
 type DropPosition = "before" | "after" | "inside";
 type DropIndicator = { targetId: string; position: DropPosition } | null;
 type ContextMenuState =
-  | { kind: "item"; item: FileItem; x: number; y: number }
+  | { kind: "item"; item: FileItem; inviteeMenuMode: InviteeSidebarMenuMode; x: number; y: number }
   | { kind: "empty"; x: number; y: number }
   | null;
 type DeleteDialogState = { item: FileItem; displayName: string } | null;
@@ -107,6 +108,8 @@ type DeleteDialogState = { item: FileItem; displayName: string } | null;
 type Props = {
   fileItems: FileItem[];
   memos: Memo[];
+  /** Signed-in user id — used to detect shared memos and trim context menus. */
+  currentUserId: string | null;
   activeMemoId: string;
   width: number;
   onSelectMemo: (id: string) => void;
@@ -160,6 +163,23 @@ function sortItems(items: FileItem[]): FileItem[] {
     if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
     return a.order - b.order;
   });
+}
+
+function isMemoSharedWithMe(memo: Memo | undefined, currentUserId: string | null): boolean {
+  return Boolean(memo?.ownerUserId && currentUserId && memo.ownerUserId !== currentUserId);
+}
+
+type InviteeSidebarMenuMode = "owner" | "editor" | "viewer";
+
+function inviteeMenuModeForItem(
+  item: FileItem,
+  memos: Memo[],
+  currentUserId: string | null,
+): InviteeSidebarMenuMode {
+  if (item.type !== "memo") return "owner";
+  const m = memos.find((x) => x.id === item.id);
+  if (!m?.ownerUserId || !currentUserId || m.ownerUserId === currentUserId) return "owner";
+  return m.shareRole === "editor" ? "editor" : "viewer";
 }
 
 function getMemoKind(item: FileItem, memo: Memo | undefined): MemoType {
@@ -330,6 +350,13 @@ function sidebarRowLabelClassAndStyle(item: FileItem, ctx: RowLabelCtx): {
   return { className: memoRowInactiveBase(ctx.kind, false), style: {} };
 }
 
+function sharedMemoIconEl(size: number, solidHue?: string) {
+  const colored = solidHue
+    ? { className: "shrink-0", style: { color: solidHue } as CSSProperties }
+    : { className: "shrink-0 text-cyan-500/85", style: undefined };
+  return <Users size={size} strokeWidth={2} {...colored} />;
+}
+
 function FavoriteItemRow({
   item,
   depth,
@@ -345,6 +372,7 @@ function FavoriteItemRow({
   onContextMenu,
   localOpen,
   toggleLocal,
+  currentUserId,
 }: {
   item: FileItem;
   depth: number;
@@ -360,6 +388,7 @@ function FavoriteItemRow({
   onContextMenu: (e: MouseEvent<HTMLDivElement>, item: FileItem) => void;
   localOpen: Set<string>;
   toggleLocal: (id: string) => void;
+  currentUserId: string | null;
 }) {
   const { t } = useTranslation();
   const [rowHover, setRowHover] = useState(false);
@@ -368,12 +397,15 @@ function FavoriteItemRow({
   const isActive = item.type === "memo" && item.id === activeMemoId;
   const isMultiSelected = selectedFileIds.includes(item.id);
   const memo = item.type === "memo" ? memos.find((m) => m.id === item.id) : undefined;
+  const sharedWithMe = item.type === "memo" && isMemoSharedWithMe(memo, currentUserId);
   const kind = isFolder ? "standard" : getMemoKind(item, memo);
   const displayName = isFolder ? item.name : (memo?.title || t("sidebar.untitledMemo"));
   const memoTitleHue = !isFolder ? sidebarMemoTitleColor(item, memo) : "";
   const folderIcon = isLocalOpen ? "📂" : "📁";
   const memoIcon = item.icon ? (
     <span className="shrink-0 leading-none">{item.icon}</span>
+  ) : sharedWithMe ? (
+    sharedMemoIconEl(9, isActive || isMultiSelected ? memoTitleHue : undefined)
   ) : (
     defaultMemoIconEl(kind, 9, isActive || isMultiSelected ? memoTitleHue : undefined)
   );
@@ -425,7 +457,7 @@ function FavoriteItemRow({
   return (
     <div>
       <div
-        draggable
+        draggable={!(item.type === "memo" && sharedWithMe)}
         onDragStart={(e) => onRowDragStart(e, item)}
         onDragEnd={onRowDragEnd}
         className={cn(
@@ -505,11 +537,119 @@ function FavoriteItemRow({
                 onContextMenu={onContextMenu}
                 localOpen={localOpen}
                 toggleLocal={toggleLocal}
+                currentUserId={currentUserId}
               />
             ))}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Shared with me (invitee) ─────────────────────────────────────────────────
+
+function SharedWithMeSection({
+  fileItems,
+  memos,
+  activeMemoId,
+  currentUserId,
+  mainTreeOrder,
+  selectedFileIds,
+  draggingIds,
+  onRowDragStart,
+  onRowDragEnd,
+  onSelectMemo,
+  onContextMenu,
+}: {
+  fileItems: FileItem[];
+  memos: Memo[];
+  activeMemoId: string;
+  currentUserId: string | null;
+  mainTreeOrder: string[];
+  selectedFileIds: string[];
+  draggingIds: string[];
+  onRowDragStart: (e: DragEvent<HTMLDivElement>, item: FileItem) => void;
+  onRowDragEnd: () => void;
+  onSelectMemo: (id: string) => void;
+  onContextMenu: (e: MouseEvent<HTMLDivElement>, item: FileItem) => void;
+}) {
+  const { t } = useTranslation();
+  const [sectionOpen, setSectionOpen] = useState(true);
+  const [localOpen, setLocalOpen] = useState<Set<string>>(new Set());
+  const toggleLocal = (id: string) =>
+    setLocalOpen((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const shared = useMemo(() => {
+    const memoById = new Map(memos.map((m) => [m.id, m]));
+    return sortItems(
+      fileItems.filter((i) => {
+        if (i.type !== "memo" || !currentUserId) return false;
+        if (i.parentId === SHARED_WITH_ME_SIDEBAR_PARENT_ID) return true;
+        const m = memoById.get(i.id);
+        return isMemoSharedWithMe(m, currentUserId);
+      }),
+    );
+  }, [fileItems, memos, currentUserId]);
+
+  if (!currentUserId || shared.length === 0) return null;
+
+  return (
+    <div className="border-b border-zinc-800/70">
+      <button
+        type="button"
+        onClick={() => setSectionOpen((p) => !p)}
+        onContextMenu={(e) => e.stopPropagation()}
+        className="flex w-full items-center gap-1.5 px-3 py-1.5 font-mono text-[9px] tracking-[2px] text-zinc-500 transition-colors hover:text-zinc-300"
+      >
+        <svg
+          className={cn(
+            "h-[6px] w-[6px] shrink-0 text-cyan-500/65 transition-transform duration-150",
+            sectionOpen && "rotate-90",
+          )}
+          viewBox="0 0 8 8"
+          fill="currentColor"
+        >
+          <polygon points="1,1 7,4 1,7" />
+        </svg>
+        <Users size={9} className="shrink-0 text-cyan-500/70" />
+        <span>{t("sidebar.sharedWithMe")}</span>
+        <span className="ml-auto text-zinc-700">{shared.length}</span>
+      </button>
+
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-200",
+          sectionOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        <div className="overflow-hidden">
+          {shared.map((item) => (
+            <FavoriteItemRow
+              key={item.id}
+              item={item}
+              depth={0}
+              fileItems={fileItems}
+              memos={memos}
+              activeMemoId={activeMemoId}
+              mainTreeOrder={mainTreeOrder}
+              selectedFileIds={selectedFileIds}
+              draggingIds={draggingIds}
+              onRowDragStart={onRowDragStart}
+              onRowDragEnd={onRowDragEnd}
+              onSelectMemo={onSelectMemo}
+              onContextMenu={onContextMenu}
+              localOpen={localOpen}
+              toggleLocal={toggleLocal}
+              currentUserId={currentUserId}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -520,6 +660,7 @@ function FavoritesSection({
   fileItems,
   memos,
   activeMemoId,
+  currentUserId,
   mainTreeOrder,
   selectedFileIds,
   draggingIds,
@@ -532,6 +673,7 @@ function FavoritesSection({
   fileItems: FileItem[];
   memos: Memo[];
   activeMemoId: string;
+  currentUserId: string | null;
   mainTreeOrder: string[];
   selectedFileIds: string[];
   draggingIds: string[];
@@ -595,6 +737,7 @@ function FavoritesSection({
               onContextMenu={onContextMenu}
               localOpen={localOpen}
               toggleLocal={toggleLocal}
+              currentUserId={currentUserId}
             />
           ))}
         </div>
@@ -606,7 +749,11 @@ function FavoritesSection({
 // ─── Main sidebar ─────────────────────────────────────────────────────────────
 
 export function FileSidebar({
-  fileItems, memos, activeMemoId, width,
+  fileItems,
+  memos,
+  currentUserId,
+  activeMemoId,
+  width,
   onSelectMemo, onAddMemo, onSetMemoType, onAddFolder,
   onToggleFolder, onRenameItem, onDeleteItem, onMoveItems, onOpenSettings,
   onDuplicateMemo, onToggleBookmark, onSetItemIcon, onSetItemColor, onExportMemo,
@@ -699,6 +846,7 @@ export function FileSidebar({
   const sharedTreeProps: Omit<TreeProps, "parentId" | "depth"> = {
     items: fileItems,
     memos,
+    currentUserId,
     activeMemoId,
     selectedFolderId,
     renamingId,
@@ -748,6 +896,7 @@ export function FileSidebar({
       setContextMenu({
         kind: "item",
         item,
+        inviteeMenuMode: inviteeMenuModeForItem(item, memos, currentUserId),
         x: Math.min(e.clientX, window.innerWidth - menuW - 4),
         y: Math.min(e.clientY, window.innerHeight - menuH - 4),
       });
@@ -800,6 +949,7 @@ export function FileSidebar({
           fileItems={fileItems}
           memos={memos}
           activeMemoId={activeMemoId}
+          currentUserId={currentUserId}
           mainTreeOrder={mainTreeOrder}
           selectedFileIds={selectedFileIds}
           draggingIds={draggingIds}
@@ -807,6 +957,20 @@ export function FileSidebar({
           onRowDragEnd={handleRowDragEnd}
           onSelectMemo={onSelectMemo}
           onToggleFavorite={onToggleBookmark}
+          onContextMenu={sharedTreeProps.onContextMenu}
+        />
+
+        <SharedWithMeSection
+          fileItems={fileItems}
+          memos={memos}
+          activeMemoId={activeMemoId}
+          currentUserId={currentUserId}
+          mainTreeOrder={mainTreeOrder}
+          selectedFileIds={selectedFileIds}
+          draggingIds={draggingIds}
+          onRowDragStart={handleRowDragStart}
+          onRowDragEnd={handleRowDragEnd}
+          onSelectMemo={onSelectMemo}
           onContextMenu={sharedTreeProps.onContextMenu}
         />
 
@@ -974,6 +1138,7 @@ export function FileSidebar({
             openShareModal(contextMenu.item.id);
             setContextMenu(null);
           }}
+          inviteeMenuMode={contextMenu.inviteeMenuMode}
         />
       ) : contextMenu?.kind === "empty" ? (
         <SidebarEmptySpaceContextMenu
@@ -1019,6 +1184,7 @@ export function FileSidebar({
 type TreeProps = {
   items: FileItem[];
   memos: Memo[];
+  currentUserId: string | null;
   parentId: string | null;
   depth: number;
   activeMemoId: string;
@@ -1074,7 +1240,7 @@ function FileTree(props: TreeProps) {
 // ─── Single file/folder row ───────────────────────────────────────────────────
 
 function FileNode({
-  item, memos, depth, activeMemoId, selectedFolderId, renamingId, draggingIds, dropIndicator,
+  item, memos, currentUserId, depth, activeMemoId, selectedFolderId, renamingId, draggingIds, dropIndicator,
   mainTreeOrder,
   selectedFileIds,
   iconEditingId, onStartIconEdit, onCommitIconEdit,
@@ -1085,6 +1251,7 @@ function FileNode({
   const { t } = useTranslation();
 
   const memo = item.type === "memo" ? memos.find((m) => m.id === item.id) : undefined;
+  const sharedWithMe = item.type === "memo" && isMemoSharedWithMe(memo, currentUserId);
   const kind = item.type === "memo" ? getMemoKind(item, memo) : "standard";
   const displayName = item.type === "memo" ? (memo?.title || t("sidebar.untitledMemo")) : item.name;
   const memoTitleHue = item.type === "memo" ? sidebarMemoTitleColor(item, memo) : "";
@@ -1175,9 +1342,13 @@ function FileNode({
 
   // Resolve icon to display
   const folderIcon = indPos === "inside" || item.isOpen ? "📂" : "📁";
-  const memoIcon   = item.icon
-    ? <span className="shrink-0 leading-none">{item.icon}</span>
-    : defaultMemoIconEl(kind, 10, isActiveMemo || isMultiSelected ? memoTitleHue : undefined);
+  const memoIcon = item.icon ? (
+    <span className="shrink-0 leading-none">{item.icon}</span>
+  ) : sharedWithMe ? (
+    sharedMemoIconEl(10, isActiveMemo || isMultiSelected ? memoTitleHue : undefined)
+  ) : (
+    defaultMemoIconEl(kind, 10, isActiveMemo || isMultiSelected ? memoTitleHue : undefined)
+  );
 
   return (
     <div>
@@ -1187,7 +1358,7 @@ function FileNode({
       )}
 
       <div
-        draggable
+        draggable={!(item.type === "memo" && sharedWithMe)}
         onDragStart={handleDragStart}
         onDragEnd={onRowDragEnd}
         onDragOver={(e) => onDragOverItem(e, item)}
@@ -1286,6 +1457,7 @@ function FileNode({
           <div className="overflow-hidden">
             <FileTree
               parentId={item.id} depth={depth + 1}
+              currentUserId={currentUserId}
               activeMemoId={activeMemoId} selectedFolderId={selectedFolderId}
               renamingId={renamingId} draggingIds={draggingIds} dropIndicator={dropIndicator}
               mainTreeOrder={mainTreeOrder}
@@ -1434,6 +1606,7 @@ type SidebarMenuProps = {
   onSetItemLabelColor: (color: FileItemColor | null, opts?: { skipHistory?: boolean }) => void;
   onMemoColorSliderUndoGestureStart?: () => void;
   onMemoColorSliderUndoGestureEnd?: () => void;
+  inviteeMenuMode: InviteeSidebarMenuMode;
 };
 
 
@@ -1445,9 +1618,12 @@ function SidebarContextMenu(props: SidebarMenuProps) {
     onSetMemoType, onSetItemLabelColor,
     onMemoColorSliderUndoGestureStart,
     onMemoColorSliderUndoGestureEnd,
+    inviteeMenuMode,
   } = props;
   const ref = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
+  const isViewerInvitee = item.type === "memo" && inviteeMenuMode === "viewer";
+  const isEditorInvitee = item.type === "memo" && inviteeMenuMode === "editor";
   const colorSliderUndoForActiveRow =
     item.type === "memo" &&
     item.id === activeMemoId &&
@@ -1534,6 +1710,59 @@ function SidebarContextMenu(props: SidebarMenuProps) {
           />
           <Divider />
           <Row icon={Trash2}     label={t("sidebar.ctx.delete")}         onClick={onDelete} danger />
+        </>
+      ) : isViewerInvitee ? (
+        <>
+          <Row icon={Download} label={t("sidebar.ctx.exportJson")} onClick={onExport} />
+          <Row
+            icon={item.isBookmarked ? StarOff : Star}
+            label={item.isBookmarked ? t("sidebar.ctx.removeFavorite") : t("sidebar.ctx.addFavorite")}
+            onClick={onToggleFavorite}
+          />
+        </>
+      ) : isEditorInvitee ? (
+        <>
+          <Row icon={Download} label={t("sidebar.ctx.exportJson")} onClick={onExport} />
+          <Row
+            icon={item.isBookmarked ? StarOff : Star}
+            label={item.isBookmarked ? t("sidebar.ctx.removeFavorite") : t("sidebar.ctx.addFavorite")}
+            onClick={onToggleFavorite}
+          />
+          <Row icon={Smile} label={t("sidebar.ctx.changeIcon")} onClick={onChangeIcon} />
+          <Divider />
+          <p className="px-3 pb-0.5 pt-1 font-mono text-[8px] tracking-wider text-zinc-600">{t("sidebar.ctx.changeType")}</p>
+          <Row
+            icon={FileText}
+            label={t("sidebar.ctx.typeStandard")}
+            active={(item.memoType ?? "standard") === "standard"}
+            onClick={() => onSetMemoType?.("standard")}
+          />
+          <Row
+            icon={Music2}
+            label={t("sidebar.ctx.typeMusic")}
+            active={item.memoType === "music"}
+            onClick={() => onSetMemoType?.("music")}
+          />
+          <Row
+            icon={Gamepad2}
+            label={t("sidebar.ctx.typeGamedev")}
+            active={item.memoType === "gamedev"}
+            onClick={() => onSetMemoType?.("gamedev")}
+          />
+          <Divider />
+          <Row icon={Pencil} label={t("sidebar.ctx.rename")} onClick={onRename} />
+          <Divider />
+          <RowTintColorPicker
+            sectionLabel={t("sidebar.ctx.labelSection")}
+            value={fileItemColorToPickerValue(item.color)}
+            onChange={(next, opts) => onSetItemLabelColor(next, { skipHistory: opts?.transient })}
+            onSliderUndoGestureStart={
+              colorSliderUndoForActiveRow ? onMemoColorSliderUndoGestureStart : undefined
+            }
+            onSliderUndoGestureEnd={colorSliderUndoForActiveRow ? onMemoColorSliderUndoGestureEnd : undefined}
+            canClearStored={hasFileItemLabel(item)}
+            className="border-t border-zinc-800/40"
+          />
         </>
       ) : (
         <>
