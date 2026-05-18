@@ -31,6 +31,7 @@ type NodeListProps = {
   ancestorCoversSelection?: boolean;
   isSelectionMode?: boolean;
   onSelectStart?: (id: string, e: React.MouseEvent) => void;
+  onMobileSelectNode?: (id: string) => void;
   onPatchPluginData: (id: string, patch: Partial<NotePluginData>, historyMode?: "immediate" | "none") => void;
   onPatchGameData: (id: string, patch: Partial<NoteGameData>, historyMode?: "immediate" | "none") => void;
   onConvertToPluginCard: (id: string) => void;
@@ -66,6 +67,7 @@ export default function NodeList({
   ancestorCoversSelection = false,
   isSelectionMode = false,
   onSelectStart,
+  onMobileSelectNode,
   onPatchPluginData,
   onPatchGameData,
   onConvertToPluginCard,
@@ -102,6 +104,7 @@ export default function NodeList({
           ancestorCoversSelection={ancestorCoversSelection}
           isSelectionMode={isSelectionMode}
           onSelectStart={onSelectStart}
+          onMobileSelectNode={onMobileSelectNode}
           memoType={memoType}
           onPatchPluginData={onPatchPluginData}
           onPatchGameData={onPatchGameData}

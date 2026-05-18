@@ -88,6 +88,7 @@ export type NoteNodeProps = {
   ancestorCoversSelection?: boolean;
   isSelectionMode?: boolean;
   onSelectStart?: (id: string, e: React.MouseEvent) => void;
+  onMobileSelectNode?: (id: string) => void;
   /** When `"music"`, shows per-line non-whitespace character count for lyrics. */
   memoType?: MemoType;
   onPatchPluginData?: (
@@ -200,6 +201,7 @@ export default function NoteNode({
   ancestorCoversSelection = false,
   isSelectionMode = false,
   onSelectStart,
+  onMobileSelectNode,
   memoType = "standard",
   onPatchPluginData,
   onPatchGameData,
@@ -467,10 +469,17 @@ export default function NoteNode({
       onMouseDown={(e) => {
         const target = e.target as HTMLElement;
         if (target.closest("button")) return;
-        if (!e.altKey) return;
+        if (!e.altKey && !isSelectionMode) return;
         e.preventDefault();
         e.stopPropagation();
         onSelectStart?.(node.id, e);
+      }}
+      onTouchStartCapture={(e) => {
+        if (!isSelectionMode) return;
+        const target = e.target as HTMLElement;
+        if (target.closest("button")) return;
+        e.preventDefault();
+        onMobileSelectNode?.(node.id);
       }}
     >
         <div ref={contentRowRef} className="relative w-full overflow-visible">
@@ -911,6 +920,7 @@ export default function NoteNode({
                   ancestorCoversSelection={childAncestorCovers}
                   isSelectionMode={isSelectionMode}
                   onSelectStart={onSelectStart}
+                  onMobileSelectNode={onMobileSelectNode}
                   memoType={memoType}
                   onPatchPluginData={onPatchPluginData}
                   onPatchGameData={onPatchGameData}

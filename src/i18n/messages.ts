@@ -119,6 +119,7 @@ const messagesEn = {
   "sidebar.ctx.typeGamedev": "Game dev",
   "sidebar.ctx.archive": "Archive",
   "sidebar.ctx.labelSection": "MEMO COLOR",
+  "sidebar.ctx.share": "Share…",
   "sidebar.archiveSoon": "Archive: coming soon",
 
   "sidebar.delete.title": "Delete \"{name}\"?",
@@ -185,12 +186,28 @@ const messagesEn = {
   "app.sidebarHide": "Hide sidebar",
   "app.sidebarShow": "Show sidebar",
 
-  // Workflow toolbar button
+  "mobile.openSidebar": "Open files",
+  "mobile.closeSidebarBackdrop": "Close file list",
+  "mobile.selectionMode": "Selection mode",
+  "mobile.selectionModeHint": "Tap rows to multi-select (like Alt+click)",
   "workflow.memoStatusTitle": "Memo status (DRAFT / WIP / DONE)",
   "workflow.memoStatusSection": "MEMO STATUS",
   "workflow.gamePipeline": "GAME PIPELINE",
 
-  // Node context menu (subset)
+  "share.title": "Share \"{name}\"",
+  "share.closeAria": "Close",
+  "share.collaboratorsSection": "People with access",
+  "share.roleViewer": "Viewer",
+  "share.roleEditor": "Editor",
+  "share.removeAria": "Remove access",
+  "share.inviteSection": "Invite",
+  "share.emailPlaceholder": "Collaborator email",
+  "share.inviteViewOnly": "View only",
+  "share.inviteCanEdit": "Can edit",
+  "share.addButton": "Add",
+  "share.mockHint":
+    "Sharing is UI preview only. Sync with collaborators will connect to your account in a later update.",
+  "toolbar.share": "Share memo",
   "ctx.structure": "STRUCTURE",
   "ctx.task": "TASK",
   "ctx.node": "NODE",
@@ -326,6 +343,7 @@ const messagesJa: Record<MessageId, string> = {
   "sidebar.ctx.typeGamedev": "ゲーム開発",
   "sidebar.ctx.archive": "アーカイブ",
   "sidebar.ctx.labelSection": "メモの色",
+  "sidebar.ctx.share": "共有…",
   "sidebar.archiveSoon": "アーカイブは準備中です",
 
   "sidebar.delete.title": "「{name}」を削除しますか？",
@@ -387,9 +405,28 @@ const messagesJa: Record<MessageId, string> = {
   "app.sidebarHide": "サイドバーを閉じる",
   "app.sidebarShow": "サイドバーを開く",
 
+  "mobile.openSidebar": "ファイル一覧を開く",
+  "mobile.closeSidebarBackdrop": "ファイル一覧を閉じる",
+  "mobile.selectionMode": "選択モード",
+  "mobile.selectionModeHint": "行をタップして複数選択（Alt+クリック相当）",
   "workflow.memoStatusTitle": "メモ全体のステータス（DRAFT / WIP / DONE）",
   "workflow.memoStatusSection": "メモのステータス",
   "workflow.gamePipeline": "ゲームパイプライン",
+
+  "share.title": "「{name}」を共有",
+  "share.closeAria": "閉じる",
+  "share.collaboratorsSection": "アクセスできる人",
+  "share.roleViewer": "閲覧者",
+  "share.roleEditor": "編集者",
+  "share.removeAria": "アクセスを削除",
+  "share.inviteSection": "招待",
+  "share.emailPlaceholder": "招待するメールアドレス",
+  "share.inviteViewOnly": "閲覧のみ",
+  "share.inviteCanEdit": "編集可",
+  "share.addButton": "追加",
+  "share.mockHint":
+    "共有は現時点では画面プレビューのみです。実際の同期は今後のアカウント連携で有効になる予定です。",
+  "toolbar.share": "メモを共有",
 
   "ctx.structure": "構成",
   "ctx.task": "タスク",

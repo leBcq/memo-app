@@ -8,10 +8,11 @@ import {
 import {
   FolderPlus, Pencil, Trash2, Download,
   Star, StarOff, Copy, Archive, Settings, FileText,
-  Music2, Gamepad2, Music, Smile,
+  Music2, Gamepad2, Music, Smile, Share2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/i18n/useTranslation";
+import { useShareModalStore } from "@/stores/shareModalStore";
 import { getMemoThemeColor, hexToRgba } from "@/lib/memoThemeColor";
 import type { FileItem, FileItemColor, FileItemLabelPreset } from "@/types/fileSystem";
 import type { MemoType } from "@/types/memoKind";
@@ -472,6 +473,7 @@ export function FileSidebar({
   onMemoColorSliderUndoGestureEnd,
 }: Props) {
   const { t } = useTranslation();
+  const openShareModal = useShareModalStore((s) => s.openShareModal);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [iconEditingId, setIconEditingId] = useState<string | null>(null);
@@ -723,6 +725,10 @@ export function FileSidebar({
           onMemoColorSliderUndoGestureEnd={onMemoColorSliderUndoGestureEnd}
           onExport={() => { onExportMemo(contextMenu.item.id); setContextMenu(null); }}
           onArchive={() => { window.alert(t("sidebar.archiveSoon")); setContextMenu(null); }}
+          onShare={() => {
+            openShareModal(contextMenu.item.id);
+            setContextMenu(null);
+          }}
         />
       )}
 
@@ -1035,6 +1041,7 @@ type SidebarMenuProps = {
   onChangeIcon: () => void;
   onExport: () => void;
   onArchive: () => void;
+  onShare: () => void;
   onSetMemoType?: (kind: MemoType) => void;
   onSetItemLabelColor: (color: FileItemColor | null, opts?: { skipHistory?: boolean }) => void;
   onMemoColorSliderUndoGestureStart?: () => void;
@@ -1046,7 +1053,7 @@ type SidebarMenuProps = {
 function SidebarContextMenu(props: SidebarMenuProps) {
   const { item, activeMemoId, x, y, onClose, onRename, onDelete,
     onAddMemoInside, onAddFolderInside,
-    onDuplicate, onToggleFavorite, onChangeIcon, onExport, onArchive,
+    onDuplicate, onToggleFavorite, onChangeIcon, onExport, onArchive, onShare,
     onSetMemoType, onSetItemLabelColor,
     onMemoColorSliderUndoGestureStart,
     onMemoColorSliderUndoGestureEnd,
@@ -1130,6 +1137,7 @@ function SidebarContextMenu(props: SidebarMenuProps) {
             onClick={onToggleFavorite}
           />
           <Row icon={Copy}      label={t("sidebar.ctx.duplicate")}    onClick={onDuplicate} />
+          <Row icon={Share2}    label={t("sidebar.ctx.share")}       onClick={onShare} />
           <Row icon={Smile}     label={t("sidebar.ctx.changeIcon")}    onClick={onChangeIcon} />
           <Divider />
           <p className="px-3 pb-0.5 pt-1 font-mono text-[8px] tracking-wider text-zinc-600">{t("sidebar.ctx.changeType")}</p>

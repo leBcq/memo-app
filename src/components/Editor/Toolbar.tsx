@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ToolbarUnifiedMemoStatusControl } from "@/components/MemoWorkflowMenu";
+import { useShareModalStore } from "@/stores/shareModalStore";
+import { Share2 } from "lucide-react";
 import { useTextFormatting, type FormatCommand } from "@/hooks/useTextFormatting";
 import {
   applyFontSizeWholeBodies,
@@ -65,6 +67,8 @@ type ToolbarProps = {
   onWorkflowChange: (status: MemoWorkflowStatus) => void;
   gamedevStage?: GamedevStage;
   onGamedevStageChange?: (stage: GamedevStage) => void;
+  /** Active memo id (for Share and other memo-scoped actions). */
+  activeMemoId: string;
 };
 
 const PRESET_COLORS = ["#a78bfa", "#60dfcd", "#f87171", "#fbbf24", "#e0e0e6"];
@@ -90,8 +94,10 @@ export default function Toolbar({
   onWorkflowChange,
   gamedevStage,
   onGamedevStageChange,
+  activeMemoId,
 }: ToolbarProps) {
   const { t } = useTranslation();
+  const openShareModal = useShareModalStore((s) => s.openShareModal);
   const colorPickerRef = useRef<HTMLInputElement>(null);
   const [fontSize, setFontSize] = useState(14);
   const [color, setColor] = useState("#a78bfa");
@@ -251,7 +257,7 @@ export default function Toolbar({
   return (
     <div
       data-geo-editor-toolbar
-      className="sticky top-0 z-50 flex min-w-0 shrink-0 flex-wrap items-center gap-1 border-b border-zinc-800/60 bg-zinc-950/95 px-3 py-1.5 backdrop-blur-sm"
+      className="sticky top-0 z-50 flex min-w-0 shrink-0 flex-nowrap items-center gap-1 overflow-x-auto border-b border-zinc-800/60 bg-zinc-950/95 px-2 py-1.5 backdrop-blur-sm sm:px-3"
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Undo / Redo */}
@@ -403,10 +409,20 @@ export default function Toolbar({
       <Separator />
 
       <div
-        className="ml-auto shrink-0"
+        className="ml-auto flex shrink-0 items-center gap-1.5"
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
+        <button
+          type="button"
+          title={t("toolbar.share")}
+          aria-label={t("toolbar.share")}
+          onClick={() => openShareModal(activeMemoId)}
+          className="flex h-6 items-center gap-1 border border-zinc-700/90 bg-zinc-900/30 px-2 text-[10px] tracking-wide text-zinc-400 transition-colors hover:border-cyan-500/40 hover:bg-zinc-900/55 hover:text-cyan-200/90"
+        >
+          <Share2 size={12} strokeWidth={1.75} className="shrink-0 opacity-85" />
+          <span className="max-[680px]:hidden">Share</span>
+        </button>
         <ToolbarUnifiedMemoStatusControl
           memoType={memoType}
           workflowStatus={workflowStatus}

@@ -6,6 +6,7 @@ import NodeList from "@/components/Editor/NodeList";
 import Toolbar from "@/components/Editor/Toolbar";
 import { FileSidebar } from "@/components/FileSidebar";
 import { SettingsModal } from "@/components/SettingsModal";
+import { ShareMemoModal } from "@/components/ShareMemoModal";
 import { TrackStatusBar } from "@/components/TrackStatusBar";
 import { GamedevToolbarStrip } from "@/components/GamedevToolbarStrip";
 import { CloudSyncIndicator } from "@/components/CloudSyncIndicator";
@@ -21,7 +22,9 @@ import {
   EDITOR_STANDARD_TEXT_COLOR,
   EDITOR_STANDARD_CARET_COLOR,
 } from "@/lib/memoThemeColor";
-import { PanelLeft, PanelLeftClose } from "lucide-react";
+import { PanelLeft, PanelLeftClose, Menu, MousePointer2 } from "lucide-react";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useMobileUiStore } from "@/stores/mobileUiStore";
 import type { MemoType } from "@/types/memoKind";
 import type { HeadingLevel, NoteNode } from "@/types/note";
 import type { MessageId } from "@/i18n/messages";
@@ -156,6 +159,11 @@ export default function Home() {
   // from localStorage synchronously before first paint via useLayoutEffect.
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_DEFAULT);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const isMdUp = useMediaQuery("(min-width: 768px)");
+  const isMobileSelectionMode = useMobileUiStore((s) => s.isMobileSelectionMode);
+  const toggleMobileSelectionMode = useMobileUiStore((s) => s.toggleMobileSelectionMode);
+  const setMobileSelectionMode = useMobileUiStore((s) => s.setMobileSelectionMode);
+  const effectiveSelectionMode = isSelectionMode || isMobileSelectionMode;
   const isResizingRef = useRef(false);
   const resizeStartXRef = useRef(0);
   const resizeStartWRef = useRef(0);
@@ -166,8 +174,19 @@ export default function Home() {
     if (!isNaN(parsed)) {
       setSidebarWidth(Math.min(Math.max(parsed, SIDEBAR_MIN), SIDEBAR_MAX));
     }
-    const openRaw = localStorage.getItem(SIDEBAR_OPEN_KEY);
-    if (openRaw === "0") setIsSidebarOpen(false);
+
+    const mq = window.matchMedia("(min-width: 768px)");
+    const syncSidebarOpen = () => {
+      if (mq.matches) {
+        const openRaw = localStorage.getItem(SIDEBAR_OPEN_KEY);
+        setIsSidebarOpen(openRaw !== "0");
+      } else {
+        setIsSidebarOpen(false);
+      }
+    };
+    syncSidebarOpen();
+    mq.addEventListener("change", syncSidebarOpen);
+    return () => mq.removeEventListener("change", syncSidebarOpen);
   }, []);
 
   useEffect(() => {
@@ -374,6 +393,9 @@ export default function Home() {
   // Reset focus when memo changes
   useEffect(() => { setFocusedNodeId(null); }, [activeMemoId]);
   useEffect(() => { setSelectedIds([]); selectionAnchorRef.current = null; }, [activeMemoId]);
+  useEffect(() => {
+    setMobileSelectionMode(false);
+  }, [activeMemoId, setMobileSelectionMode]);
 
   // Sync focused-node header contenteditable when the focused node changes
   useLayoutEffect(() => {
@@ -499,7 +521,8 @@ export default function Home() {
 
   // ── Block selection: Alt+Shift+click / Alt+drag / Alt+marquee ( editors locked while Alt held )
   const handleBlockSelectMouseDown = useCallback((id: string, e: React.MouseEvent) => {
-    if (!e.altKey) return;
+    const mobileSel = useMobileUiStore.getState().isMobileSelectionMode;
+    if (!e.altKey && !mobileSel) return;
 
     if (e.shiftKey) {
       e.preventDefault();
@@ -527,6 +550,12 @@ export default function Home() {
     selectionAnchorRef.current = id;
     isDragSelectRef.current = true;
   }, [selectedIds]);
+
+  const handleMobileSelectNode = useCallback((id: string) => {
+    setSelectedIds([id]);
+    selectionAnchorRef.current = id;
+    isDragSelectRef.current = false;
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -566,7 +595,9 @@ export default function Home() {
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
-      if (!e.altKey) {
+      const blockSel =
+        e.altKey || useMobileUiStore.getState().isMobileSelectionMode;
+      if (!blockSel) {
         if (isMarqueeRef.current || isDragSelectRef.current) {
           isMarqueeRef.current = false;
           isDragSelectRef.current = false;
@@ -714,22 +745,35 @@ export default function Home() {
             ? (stage) => patchActiveGamedevMeta({ stage })
             : undefined
         }
+        activeMemoId={activeMemoId}
       />
 
+      <ShareMemoModal fileItems={fileItems} />
       <div className="relative flex min-h-0 min-w-0 flex-1">
+        {isSidebarOpen && (
+          <button
+            type="button"
+            aria-label={t("mobile.closeSidebarBackdrop")}
+            className="fixed inset-0 z-[85] bg-black/55 backdrop-blur-[2px] md:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
         <button
           type="button"
           aria-expanded={isSidebarOpen}
-          aria-label={isSidebarOpen ? "サイドバーを閉じる" : "サイドバーを開く"}
+          aria-label={isSidebarOpen ? t("app.sidebarHide") : t("app.sidebarShow")}
           onClick={() => {
             setIsSidebarOpen((o) => {
               const next = !o;
-              localStorage.setItem(SIDEBAR_OPEN_KEY, next ? "1" : "0");
+              if (typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches) {
+                localStorage.setItem(SIDEBAR_OPEN_KEY, next ? "1" : "0");
+              }
               return next;
             });
           }}
           className={cn(
-            "absolute top-2 z-30 flex h-8 w-8 items-center justify-center rounded-md border border-zinc-800/80 bg-zinc-950/95 text-zinc-400 shadow-lg shadow-black/30 backdrop-blur-sm transition-[left,transform,colors] duration-300 ease-out hover:border-cyan-500/40 hover:text-cyan-300",
+            "absolute top-2 z-30 hidden h-8 w-8 items-center justify-center rounded-md border border-zinc-800/80 bg-zinc-950/95 text-zinc-400 shadow-lg shadow-black/30 backdrop-blur-sm transition-[left,transform,colors] duration-300 ease-out hover:border-cyan-500/40 hover:text-cyan-300 md:flex",
           )}
           style={{ left: isSidebarOpen ? sidebarWidth + 6 : 10 }}
           title={isSidebarOpen ? t("app.sidebarHide") : t("app.sidebarShow")}
@@ -739,17 +783,26 @@ export default function Home() {
 
         <div
           className={cn(
-            "flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-zinc-800/40 transition-[width] duration-300 ease-out",
-            isSidebarOpen && "border-r",
+            "flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-zinc-800/40 bg-zinc-950 transition-[width,transform] duration-300 ease-out",
+            "fixed inset-y-0 left-0 z-[90] max-w-[min(100vw,600px)] shadow-[4px_0_24px_rgba(0,0,0,0.45)] md:relative md:inset-auto md:z-auto md:max-w-none md:shadow-none",
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+            isSidebarOpen && "border-r border-zinc-800/40",
           )}
-          style={{ width: isSidebarOpen ? sidebarWidth : 0 }}
+          style={{
+            width: isMdUp ? (isSidebarOpen ? sidebarWidth : 0) : sidebarWidth,
+          }}
         >
           <FileSidebar
             width={sidebarWidth}
             fileItems={fileItems}
             memos={memos}
             activeMemoId={activeMemoId}
-            onSelectMemo={switchMemo}
+            onSelectMemo={(id) => {
+              switchMemo(id);
+              if (typeof window !== "undefined" && !window.matchMedia("(min-width: 768px)").matches) {
+                setIsSidebarOpen(false);
+              }
+            }}
             onAddMemo={handleAddMemo}
             onSetMemoType={setMemoType}
             onAddFolder={addFolder}
@@ -769,10 +822,10 @@ export default function Home() {
           />
         </div>
 
-        {/* Resize handle */}
+        {/* Resize handle — desktop only */}
         <div
           className={cn(
-            "group relative z-10 flex h-full min-h-0 w-1 shrink-0 cursor-col-resize items-center justify-center transition-all duration-300 ease-out",
+            "group relative z-10 hidden h-full min-h-0 w-1 shrink-0 cursor-col-resize items-center justify-center transition-all duration-300 ease-out md:flex",
             !isSidebarOpen && "pointer-events-none w-0 max-w-0 opacity-0",
           )}
           onMouseDown={(e) => {
@@ -785,7 +838,6 @@ export default function Home() {
             document.body.style.cursor = "col-resize";
           }}
         >
-          {/* Visual line — becomes cyan on hover / during drag */}
           <div className="h-full w-px bg-zinc-800/70 transition-colors group-hover:bg-cyan-500/50" />
         </div>
 
@@ -797,6 +849,20 @@ export default function Home() {
         )}
 
         <div ref={memoWorkspaceRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex h-10 shrink-0 items-center gap-2 border-b border-zinc-800/50 bg-zinc-950/95 px-2 md:hidden">
+            <button
+              type="button"
+              aria-label={t("mobile.openSidebar")}
+              onClick={() => setIsSidebarOpen(true)}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-zinc-700/90 bg-zinc-900/50 text-zinc-300 transition-colors hover:border-cyan-500/40 hover:text-cyan-200"
+            >
+              <Menu size={18} strokeWidth={1.75} />
+            </button>
+            <span className="min-w-0 truncate font-mono text-[11px] tracking-wide text-zinc-400">
+              {activeMemo.title || t("app.memoTitlePlaceholder")}
+            </span>
+          </div>
+
           {/* Mode strip: music tools or gamedev spec tools (fixed h-9). */}
           <div
             className={cn(
@@ -834,20 +900,20 @@ export default function Home() {
           <div
             className="min-h-0 flex-1 overflow-y-auto"
             onMouseDown={(e) => {
-            const t = e.target as HTMLElement;
-            if (t.closest('[data-geo-block="note-node"]')) return;
-            if (t.closest("[data-geo-editor-root]")) return;
-            if (t.closest("[data-geo-node-context-menu]")) return;
-            if (t.closest("[contenteditable]")) return;
-            if (t.closest("button, input, textarea, a")) return;
-            setSelectedIds([]);
-            selectionAnchorRef.current = null;
-          }}
-        >
+              const t = e.target as HTMLElement;
+              if (t.closest('[data-geo-block="note-node"]')) return;
+              if (t.closest("[data-geo-editor-root]")) return;
+              if (t.closest("[data-geo-node-context-menu]")) return;
+              if (t.closest("[contenteditable]")) return;
+              if (t.closest("button, input, textarea, a")) return;
+              setSelectedIds([]);
+              selectionAnchorRef.current = null;
+            }}
+          >
           <div key={activeMemoId} className={cn(
-            "mx-auto px-6 pb-12 pt-6",
-            isSelectionMode && "cursor-cell select-none",
-          )} style={{ maxWidth: "var(--editor-max-width)", fontSize: "var(--editor-font-size)", fontFamily: "var(--editor-font-family)" }}>
+            "mx-auto w-full max-w-[var(--editor-max-width)] px-4 pb-10 pt-4 sm:px-5 md:px-6 md:pb-12 md:pt-6",
+            effectiveSelectionMode && "cursor-cell select-none",
+          )} style={{ fontSize: "var(--editor-font-size)", fontFamily: "var(--editor-font-family)" }}>
 
             {/* ── Breadcrumbs (visible only in focus mode) ── */}
             {focusedPath && (
@@ -901,7 +967,7 @@ export default function Home() {
                 ) : (
                 <div
                   ref={focusedHeaderRef}
-                  contentEditable={!isSelectionMode}
+                  contentEditable={!effectiveSelectionMode}
                   suppressContentEditableWarning
                   data-geo-editor="focus-title"
                   data-ph={t("app.focusNodeTitlePh")}
@@ -928,7 +994,7 @@ export default function Home() {
                 ref={titleRef}
                 type="text"
                 value={activeMemo.title}
-                readOnly={isSelectionMode}
+                readOnly={effectiveSelectionMode}
                 onChange={(e) => updateMemoTitle(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
@@ -949,7 +1015,9 @@ export default function Home() {
               className="relative min-h-[45vh] pb-8"
               onMouseDown={(e) => {
                 const t = e.target as HTMLElement;
-                if (!e.altKey) return;
+                const blockSel =
+                  e.altKey || useMobileUiStore.getState().isMobileSelectionMode;
+                if (!blockSel) return;
                 if (t.closest('[data-geo-block="note-node"]')) return;
                 if (t.closest("[contenteditable]")) return;
                 if (t.closest("button, input, textarea, a")) return;
@@ -1000,8 +1068,9 @@ export default function Home() {
                 onDeleteEmpty={deleteNodeAndFocusPrev}
                 onFocusNode={handleFocusNode}
                 selectedIds={selectedIds}
-                isSelectionMode={isSelectionMode}
+                isSelectionMode={effectiveSelectionMode}
                 onSelectStart={handleBlockSelectMouseDown}
+                onMobileSelectNode={handleMobileSelectNode}
                 onPatchPluginData={patchNodePluginData}
                 onPatchGameData={patchNodeGameData}
                 onConvertToPluginCard={convertNodeToPluginCard}
@@ -1012,6 +1081,22 @@ export default function Home() {
         </div>
         </div>
       </div>
+      <button
+        type="button"
+        onClick={() => toggleMobileSelectionMode()}
+        title={t("mobile.selectionModeHint")}
+        aria-pressed={isMobileSelectionMode}
+        aria-label={t("mobile.selectionMode")}
+        className={cn(
+          "fixed bottom-20 right-4 z-[88] flex h-12 w-12 touch-manipulation items-center justify-center rounded-md border shadow-[0_8px_30px_rgba(0,0,0,0.4)] md:hidden",
+          isMobileSelectionMode
+            ? "border-cyan-400/55 bg-cyan-950/45 text-cyan-200 shadow-cyan-500/15"
+            : "border-zinc-600/80 bg-zinc-900/95 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200",
+        )}
+      >
+        <MousePointer2 size={22} strokeWidth={1.75} />
+      </button>
+
       <CloudSyncIndicator
         phase={cloudSync.phase}
         message={cloudSync.message}
