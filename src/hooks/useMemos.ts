@@ -83,6 +83,60 @@ const DEFAULT_MEMO_ID_TRACK = "a0000001-0001-4000-8001-000000000001";
 const DEFAULT_MEMO_ID_GAMEDEV = "a0000002-0002-4000-8002-000000000002";
 const DEFAULT_MEMO_ID_IDEAS = "a0000003-0003-4000-8003-000000000003";
 
+/** Deterministic outline node ids for seed memos (never randomUUID — avoids SSR/CSR `data-node-id` mismatch). */
+const DEF_NODE_T1 = "b0000001-c001-4000-8001-000000000001";
+const DEF_NODE_T2 = "b0000001-c001-4000-8001-000000000002";
+const DEF_NODE_T3 = "b0000001-c001-4000-8001-000000000003";
+const DEF_NODE_G1 = "b0000002-c002-4000-8002-000000000001";
+const DEF_NODE_G2 = "b0000002-c002-4000-8002-000000000002";
+const DEF_NODE_I1 = "b0000003-c003-4000-8003-000000000001";
+const DEF_NODE_I2 = "b0000003-c003-4000-8003-000000000002";
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object";
+}
+
+/** User-visible cloud error line — includes PostgREST `code` when present. */
+function cloudErrorUserMessage(e: unknown, fallback: string): string {
+  if (e instanceof Error && e.message) return e.message;
+  if (isRecord(e) && typeof e.message === "string" && e.message.trim() !== "") {
+    const code = typeof e.code === "string" && e.code ? `${e.code}: ` : "";
+    return `${code}${e.message}`;
+  }
+  try {
+    const s = JSON.stringify(e);
+    if (s && s !== "{}") return s;
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
+/** Logs sync/save failures with PostgREST fields and stack (never rely on empty `console.error(e)`). */
+function logFreaviaCloudError(scope: string, e: unknown) {
+  if (e instanceof Error) {
+    console.error(scope, e.message, e.stack ?? "(no stack)", e);
+    return;
+  }
+  if (isRecord(e)) {
+    const payload = {
+      ...e,
+      code: e.code,
+      message: e.message,
+      details: e.details,
+      hint: e.hint,
+    };
+    console.error(scope, payload);
+    try {
+      console.error(`${scope} json`, JSON.stringify(e));
+    } catch {
+      console.error(`${scope} (not JSON-serializable)`, String(e));
+    }
+    return;
+  }
+  console.error(scope, String(e));
+}
+
 type StorageData = {
   memos: Memo[];
   activeMemoId: string;
@@ -133,9 +187,9 @@ const DEFAULT_MEMOS: Memo[] = [
     musicMeta: { bpm: 128, key: "D", scale: "minor", musicReleaseStatus: "DEMO" },
     gamedevMeta: null,
     nodes: [
-      createNode({ content: "Session 2026-05" }),
-      createNode({ content: "Chord ideas" }),
-      createNode({ content: "Lyrics draft" }),
+      createNode({ id: DEF_NODE_T1, content: "Session 2026-05" }),
+      createNode({ id: DEF_NODE_T2, content: "Chord ideas" }),
+      createNode({ id: DEF_NODE_T3, content: "Lyrics draft" }),
     ],
     updatedAt: new Date().toISOString(),
   },
@@ -147,8 +201,8 @@ const DEFAULT_MEMOS: Memo[] = [
     musicMeta: null,
     gamedevMeta: { ...DEFAULT_GAMEDEV_META },
     nodes: [
-      createNode({ content: "Mechanics overview" }),
-      createNode({ content: "World building notes" }),
+      createNode({ id: DEF_NODE_G1, content: "Mechanics overview" }),
+      createNode({ id: DEF_NODE_G2, content: "World building notes" }),
     ],
     updatedAt: new Date().toISOString(),
   },
@@ -160,8 +214,8 @@ const DEFAULT_MEMOS: Memo[] = [
     musicMeta: null,
     gamedevMeta: null,
     nodes: [
-      createNode({ content: "Product concepts" }),
-      createNode({ content: "Research notes" }),
+      createNode({ id: DEF_NODE_I1, content: "Product concepts" }),
+      createNode({ id: DEF_NODE_I2, content: "Research notes" }),
     ],
     updatedAt: new Date().toISOString(),
   },
@@ -478,7 +532,7 @@ export function useMemos() {
 
     void (async () => {
       try {
-        const rows = await fetchUserMemos(client, user.id);
+        const rows = await fetchUserMemos(client, user.id, user.email ?? null);
         if (cancelled) return;
 
         if (rows.length > 0) {
@@ -539,9 +593,9 @@ export function useMemos() {
         }
       } catch (e) {
         if (cancelled) return;
-        console.error(e);
+        logFreaviaCloudError("[useMemos] initial cloud sync failed", e);
         setCloudPhase("error");
-        setCloudMessage(e instanceof Error ? e.message : "Sync failed");
+        setCloudMessage(cloudErrorUserMessage(e, "Sync failed"));
         setCloudReady(false);
       }
     })();
@@ -549,7 +603,7 @@ export function useMemos() {
     return () => {
       cancelled = true;
     };
-  }, [isHydrated, configured, authLoading, user?.id]);
+  }, [isHydrated, configured, authLoading, user?.id, user?.email]);
 
   useEffect(() => {
     if (!isHydrated || !cloudReady || !user) return;
@@ -584,9 +638,9 @@ export function useMemos() {
             setCloudPhase((p) => (p === "saved" ? "idle" : p));
           }, 1400);
         } catch (e) {
-          console.error(e);
+          logFreaviaCloudError("[useMemos] debounced cloud save failed", e);
           setCloudPhase("error");
-          setCloudMessage(e instanceof Error ? e.message : "Save failed");
+          setCloudMessage(cloudErrorUserMessage(e, "Save failed"));
         }
       })();
     }, 2200);
@@ -775,9 +829,9 @@ export function useMemos() {
             );
           })
           .catch((e) => {
-            console.error(e);
+            logFreaviaCloudError("[useMemos] insertMemoRow (create) failed", e);
             setCloudPhase("error");
-            setCloudMessage(e instanceof Error ? e.message : "Create failed");
+            setCloudMessage(cloudErrorUserMessage(e, "Create failed"));
           });
       }
       return newMemo.id;
@@ -924,9 +978,9 @@ export function useMemos() {
             );
           })
           .catch((e) => {
-            console.error(e);
+            logFreaviaCloudError("[useMemos] insertMemoRow (duplicate) failed", e);
             setCloudPhase("error");
-            setCloudMessage(e instanceof Error ? e.message : "Duplicate failed");
+            setCloudMessage(cloudErrorUserMessage(e, "Duplicate failed"));
           });
       }
     },
@@ -1161,6 +1215,77 @@ export function useMemos() {
     [],
   );
 
+  /**
+   * Batch move/reorder — same rules as {@link moveItem}, preserves order of `draggedIds`
+   * when inserting (caller should pass ids in visual order).
+   */
+  const moveItems = useCallback(
+    (draggedIds: string[], targetParentId: string | null, insertBeforeId?: string | null) => {
+      const orderedUnique: string[] = [];
+      const seen = new Set<string>();
+      for (const id of draggedIds) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        orderedUnique.push(id);
+      }
+      if (orderedUnique.length === 0) return;
+
+      setFileItems((prev) => {
+        const idSet = new Set(orderedUnique);
+
+        if (targetParentId !== null && idSet.has(targetParentId)) return prev;
+
+        const isDescendantOf = (checkId: string, ancestorId: string): boolean => {
+          if (checkId === ancestorId) return true;
+          const item = prev.find((i) => i.id === checkId);
+          if (!item || item.parentId === null) return false;
+          return isDescendantOf(item.parentId, ancestorId);
+        };
+
+        if (targetParentId !== null) {
+          for (const did of orderedUnique) {
+            const d = prev.find((i) => i.id === did);
+            if (d?.type === "folder" && isDescendantOf(targetParentId, did)) return prev;
+            if (isDescendantOf(targetParentId, did)) return prev;
+          }
+        }
+
+        for (const did of orderedUnique) {
+          if (!prev.find((i) => i.id === did)) return prev;
+        }
+
+        const draggedItems = orderedUnique.map((id) => prev.find((i) => i.id === id)!);
+
+        const siblings = prev
+          .filter((i) => i.parentId === targetParentId && !idSet.has(i.id))
+          .sort((a, b) => a.order - b.order);
+
+        let insertIdx = siblings.length;
+        if (insertBeforeId) {
+          const idx = siblings.findIndex((i) => i.id === insertBeforeId);
+          if (idx !== -1) insertIdx = idx;
+        }
+
+        const reparented = draggedItems.map((it) => ({ ...it, parentId: targetParentId }));
+        const newSiblings = [...siblings];
+        newSiblings.splice(insertIdx, 0, ...reparented);
+
+        const orderMap = new Map(newSiblings.map((item, i) => [item.id, i * 10]));
+
+        return prev.map((item) => {
+          if (idSet.has(item.id)) {
+            return { ...item, parentId: targetParentId, order: orderMap.get(item.id)! };
+          }
+          if (orderMap.has(item.id)) {
+            return { ...item, order: orderMap.get(item.id)! };
+          }
+          return item;
+        });
+      });
+    },
+    [],
+  );
+
   const deleteFileItem = useCallback((id: string) => {
     // Recursively collect all descendant IDs to delete
     const collectIds = (parentId: string): string[] => {
@@ -1177,10 +1302,10 @@ export function useMemos() {
       for (const mid of memoIdsToDelete) {
         if (!isUuid(mid)) continue;
         lastCloudFingerprintRef.current.delete(mid);
-        void deleteMemoRow(client, user.id, mid).catch((e) => {
-          console.error(e);
+        void deleteMemoRow(client, mid).catch((e) => {
+          logFreaviaCloudError(`[useMemos] deleteMemoRow failed memoId=${mid}`, e);
           setCloudPhase("error");
-          setCloudMessage(e instanceof Error ? e.message : "Delete failed");
+          setCloudMessage(cloudErrorUserMessage(e, "Delete failed"));
         });
       }
     }
@@ -1618,9 +1743,9 @@ export function useMemos() {
             setCloudPhase((p) => (p === "saved" ? "idle" : p));
           }, 1400);
         } catch (e) {
-          console.error(e);
+          logFreaviaCloudError("[useMemos] import backup sync failed", e);
           setCloudPhase("error");
-          setCloudMessage(e instanceof Error ? e.message : "Import sync failed");
+          setCloudMessage(cloudErrorUserMessage(e, "Import sync failed"));
           throw e;
         }
       }
@@ -1657,6 +1782,7 @@ export function useMemos() {
     renameItem,
     deleteFileItem,
     moveItem,
+    moveItems,
     duplicateMemo,
     toggleBookmark,
     setItemIcon,

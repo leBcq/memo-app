@@ -132,6 +132,8 @@ function shouldDeferGlobalUndoToNative(): boolean {
   return false;
 }
 
+const BLOCK_SELECT_DRAG_THRESHOLD_PX = 4;
+
 export default function Home() {
   const { t } = useTranslation();
   const crumbLabel = useCallback((node: NoteNode) => crumbLabelRich(node, t), [t]);
@@ -154,6 +156,9 @@ export default function Home() {
   const selectionAnchorRef = useRef<string | null>(null);
   const isMarqueeRef = useRef(false);
   const marqueeOriginRef = useRef({ x: 0, y: 0 });
+  /** Pending pointer for Alt/mobile: click toggles, move extends range */
+  const blockSelectPointerRef = useRef<{ id: string; x: number; y: number } | null>(null);
+  const blockSelectRangeDragRef = useRef(false);
   const [marqueeRect, setMarqueeRect] = useState<{
     left: number; top: number; width: number; height: number;
   } | null>(null);
@@ -249,7 +254,7 @@ export default function Home() {
     expandNodePathInMemo,
     renameItem,
     deleteFileItem,
-    moveItem,
+    moveItems,
     duplicateMemo,
     toggleBookmark,
     setItemIcon,
@@ -430,6 +435,8 @@ export default function Home() {
     const clearDragging = () => {
       isDragSelectRef.current = false;
       isMarqueeRef.current = false;
+      blockSelectPointerRef.current = null;
+      blockSelectRangeDragRef.current = false;
       setMarqueeRect(null);
     };
     const onKeyDown = (e: KeyboardEvent) => {
@@ -564,6 +571,8 @@ export default function Home() {
     if (e.shiftKey) {
       e.preventDefault();
       e.stopPropagation();
+      blockSelectPointerRef.current = null;
+      blockSelectRangeDragRef.current = false;
       const anchor = selectionAnchorRef.current ?? selectedIds[0] ?? id;
       const ids = getDomOrderedNodeIds();
       const aIdx = ids.indexOf(anchor);
@@ -583,15 +592,21 @@ export default function Home() {
 
     e.preventDefault();
     e.stopPropagation();
-    setSelectedIds([id]);
     selectionAnchorRef.current = id;
+    blockSelectPointerRef.current = { id, x: e.clientX, y: e.clientY };
+    blockSelectRangeDragRef.current = false;
     isDragSelectRef.current = true;
   }, [selectedIds]);
 
   const handleMobileSelectNode = useCallback((id: string) => {
-    setSelectedIds([id]);
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      return [...prev, id];
+    });
     selectionAnchorRef.current = id;
     isDragSelectRef.current = false;
+    blockSelectPointerRef.current = null;
+    blockSelectRangeDragRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -638,6 +653,8 @@ export default function Home() {
         if (isMarqueeRef.current || isDragSelectRef.current) {
           isMarqueeRef.current = false;
           isDragSelectRef.current = false;
+          blockSelectPointerRef.current = null;
+          blockSelectRangeDragRef.current = false;
           setMarqueeRect(null);
         }
         return;
@@ -662,6 +679,16 @@ export default function Home() {
       if (!nodeEl) return;
       const hoverId = nodeEl.getAttribute("data-node-id") ?? "";
       if (!hoverId) return;
+
+      const down = blockSelectPointerRef.current;
+      if (down && !blockSelectRangeDragRef.current) {
+        const dist = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+        if (dist > BLOCK_SELECT_DRAG_THRESHOLD_PX || hoverId !== down.id) {
+          blockSelectRangeDragRef.current = true;
+        }
+      }
+      if (!blockSelectRangeDragRef.current) return;
+
       const ids = getDomOrderedNodeIds();
       const aIdx = ids.indexOf(selectionAnchorRef.current);
       const bIdx = ids.indexOf(hoverId);
@@ -682,8 +709,7 @@ export default function Home() {
         isMarqueeRef.current = false;
         setMarqueeRect(null);
         if (w < 4 && h < 4) {
-          setSelectedIds([]);
-          selectionAnchorRef.current = null;
+          /* tiny box: treat as accidental click, keep selection */
         } else {
           const box = { left, top, right, bottom };
           const hit: string[] = [];
@@ -698,6 +724,21 @@ export default function Home() {
         }
         return;
       }
+
+      if (
+        isDragSelectRef.current &&
+        blockSelectPointerRef.current &&
+        !blockSelectRangeDragRef.current
+      ) {
+        const tid = blockSelectPointerRef.current.id;
+        setSelectedIds((prev) => {
+          if (prev.includes(tid)) return prev.filter((x) => x !== tid);
+          return [...prev, tid];
+        });
+        selectionAnchorRef.current = tid;
+      }
+      blockSelectPointerRef.current = null;
+      blockSelectRangeDragRef.current = false;
       isDragSelectRef.current = false;
     };
 
@@ -826,7 +867,7 @@ export default function Home() {
               onToggleFolder={toggleFolder}
               onRenameItem={renameItem}
               onDeleteItem={deleteFileItem}
-              onMoveItem={moveItem}
+              onMoveItems={moveItems}
               onOpenSettings={() => setSettingsOpen(true)}
               onDuplicateMemo={duplicateMemo}
               onToggleBookmark={toggleBookmark}
@@ -1070,8 +1111,6 @@ export default function Home() {
                 isMarqueeRef.current = true;
                 marqueeOriginRef.current = { x, y };
                 setMarqueeRect({ left: x, top: y, width: 0, height: 0 });
-                setSelectedIds([]);
-                selectionAnchorRef.current = null;
                 e.preventDefault();
                 e.stopPropagation();
               }}
@@ -1084,6 +1123,7 @@ export default function Home() {
                 onActive={(id, editor) => {
                   setActiveId(id);
                   activeEditorRef.current = editor;
+                  if (effectiveSelectionMode) return;
                   setSelectedIds((prev) => {
                     if (prev.length === 0) return prev;
                     if (prev.includes(id)) return prev;

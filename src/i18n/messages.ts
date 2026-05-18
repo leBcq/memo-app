@@ -212,8 +212,14 @@ const messagesEn = {
   "share.inviteViewOnly": "View only",
   "share.inviteCanEdit": "Can edit",
   "share.addButton": "Add",
-  "share.mockHint":
-    "Sharing is UI preview only. Sync with collaborators will connect to your account in a later update.",
+  "share.loading": "Loading…",
+  "share.signInRequired": "Sign in to manage sharing.",
+  "share.needsCloudId": "Cloud memos (UUID id) can be shared. Sync this memo first.",
+  "share.loadError": "Could not load collaborators.",
+  "share.saveError": "Could not save. Check permissions or try again.",
+  "share.inviteReadOnly": "Only the memo owner can change invites.",
+  "share.footerHint":
+    "Invitees sign in with the same email (e.g. Google) to see shared memos in their cloud library.",
   "toolbar.share": "Share memo",
   "ctx.structure": "STRUCTURE",
   "ctx.task": "TASK",
@@ -438,8 +444,14 @@ const messagesJa: Record<MessageId, string> = {
   "share.inviteViewOnly": "閲覧のみ",
   "share.inviteCanEdit": "編集可",
   "share.addButton": "追加",
-  "share.mockHint":
-    "共有は現時点では画面プレビューのみです。実際の同期は今後のアカウント連携で有効になる予定です。",
+  "share.loading": "読み込み中…",
+  "share.signInRequired": "共有を管理するにはログインしてください。",
+  "share.needsCloudId": "共有できるのはクラウドのメモ（UUID）です。先に同期してください。",
+  "share.loadError": "共有一覧を読み込めませんでした。",
+  "share.saveError": "保存できませんでした。権限を確認するか再試行してください。",
+  "share.inviteReadOnly": "招待を変更できるのはメモの所有者だけです。",
+  "share.footerHint":
+    "招待された人は同じメール（例: Google）でサインインすると、自分のクラウド一覧に共有メモが表示されます。",
   "toolbar.share": "メモを共有",
 
   "ctx.structure": "構成",

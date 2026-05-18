@@ -13,6 +13,7 @@ import { normalizeMemoWorkflowStatus, type MemoWorkflowStatus } from "@/types/me
 import { normalizeNode, cloneNoteTreeForPersistence } from "@/types/note";
 import { normalizeHexColorOrNull, fileItemColorToMemoThemeHex } from "@/lib/memoThemeColor";
 import { normalizeFileItemStoredColor } from "@/lib/fileItemLabelStyles";
+import { normalizeShareEmail } from "@/lib/supabaseShares";
 
 export type MemoDbRow = {
   id: string;
@@ -184,14 +185,50 @@ export function cloudMemoFingerprint(m: Memo, fileItem: FileItem | undefined): s
 export async function fetchUserMemos(
   client: SupabaseClient,
   userId: string,
+  inviteEmail?: string | null,
 ): Promise<MemoDbRow[]> {
-  const { data, error } = await client
+  const { data: owned, error: e1 } = await client
     .from("memos")
     .select("id,user_id,title,content,theme_color,created_at,updated_at")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as MemoDbRow[];
+  if (e1) throw e1;
+
+  const rows: MemoDbRow[] = [...((owned ?? []) as MemoDbRow[])];
+  const seen = new Set(rows.map((r) => r.id));
+
+  const norm =
+    typeof inviteEmail === "string" && inviteEmail.trim().length > 0
+      ? normalizeShareEmail(inviteEmail)
+      : "";
+  if (norm.length > 0) {
+    const { data: sh, error: e2 } = await client
+      .from("memo_shares")
+      .select("memo_id")
+      .eq("shared_with_email", norm);
+    if (e2) throw e2;
+    const ids = [...new Set((sh ?? []).map((r: { memo_id: string }) => r.memo_id))];
+    if (ids.length > 0) {
+      const { data: sharedRows, error: e3 } = await client
+        .from("memos")
+        .select("id,user_id,title,content,theme_color,created_at,updated_at")
+        .in("id", ids);
+      if (e3) throw e3;
+      for (const r of (sharedRows ?? []) as MemoDbRow[]) {
+        if (!seen.has(r.id)) {
+          seen.add(r.id);
+          rows.push(r);
+        }
+      }
+    }
+  }
+
+  rows.sort((a, b) => {
+    const ta = typeof a.updated_at === "string" ? a.updated_at : "";
+    const tb = typeof b.updated_at === "string" ? b.updated_at : "";
+    return tb.localeCompare(ta);
+  });
+  return rows;
 }
 
 export async function insertMemoRow(
@@ -212,31 +249,29 @@ export async function insertMemoRow(
   if (error) throw error;
 }
 
-/** Insert or replace row by id (covers memos created while cloud session was still connecting). */
+/** Insert new row or update existing by id. New rows require owner userId for user_id column. */
 export async function upsertMemoRow(
   client: SupabaseClient,
   userId: string,
   memo: Memo,
   fileItem: FileItem | undefined,
 ): Promise<void> {
-  const content = memoToContentPayload(memo, fileItem);
-  const { error } = await client.from("memos").upsert(
-    {
-      id: memo.id,
-      user_id: userId,
-      title: memo.title,
-      content,
-      theme_color: memo.themeColor,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "id" },
-  );
-  if (error) throw error;
+  const { data: existing, error: selErr } = await client
+    .from("memos")
+    .select("id")
+    .eq("id", memo.id)
+    .maybeSingle();
+  if (selErr) throw selErr;
+  if (existing) {
+    await updateMemoRow(client, memo, fileItem);
+  } else {
+    await insertMemoRow(client, userId, memo, fileItem);
+  }
 }
 
+/** Content update; access controlled by RLS (owner or shared editor). */
 export async function updateMemoRow(
   client: SupabaseClient,
-  userId: string,
   memo: Memo,
   fileItem: FileItem | undefined,
 ): Promise<void> {
@@ -249,13 +284,12 @@ export async function updateMemoRow(
       theme_color: memo.themeColor,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", memo.id)
-    .eq("user_id", userId);
+    .eq("id", memo.id);
   if (error) throw error;
 }
 
-export async function deleteMemoRow(client: SupabaseClient, userId: string, id: string): Promise<void> {
-  const { error } = await client.from("memos").delete().eq("id", id).eq("user_id", userId);
+export async function deleteMemoRow(client: SupabaseClient, id: string): Promise<void> {
+  const { error } = await client.from("memos").delete().eq("id", id);
   if (error) throw error;
 }
 

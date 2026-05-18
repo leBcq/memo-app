@@ -93,14 +93,17 @@ export function normalizeGameData(raw: unknown): NoteGameData {
 }
 
 export function createNode(partial?: Partial<NoteNode>): NoteNode {
-  const { pluginData: pIn, gameData: gIn, ...rest } = partial ?? {};
+  const { pluginData: pIn, gameData: gIn, id: idPartial, ...rest } = partial ?? {};
   let pluginData = pIn !== undefined ? normalizePluginData(pIn) : undefined;
   let gameData = gIn !== undefined ? normalizeGameData(gIn) : undefined;
   if (gameData) pluginData = undefined;
   else if (pluginData) gameData = undefined;
 
+  const id =
+    typeof idPartial === "string" && idPartial.length > 0 ? idPartial : createId();
+
   return {
-    id: createId(),
+    id,
     content: "",
     children: [],
     collapsed: false,
