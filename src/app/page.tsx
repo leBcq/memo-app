@@ -844,18 +844,30 @@ export default function Home() {
           />
         )}
 
-        {/* Sidebar shell: outer = no overflow (mobile X sits here); inner = clips leaking text when width → 0 */}
+        {/*
+          Sidebar flex slot: on mobile the outer shell stays width 0 so it does not steal ~80vw from the
+          editor row (fixed children can still get a huge flex base size otherwise). The real drawer is the
+          inner panel (fixed on max-md). When closed on mobile, inner uses display:none per Tailwind `hidden`.
+        */}
         <div
           className={cn(
-            "relative flex h-full min-h-0 shrink-0 flex-col border-zinc-800/40 bg-zinc-950 transition-[transform,width] duration-300 ease-out",
-            "fixed top-0 left-0 z-50 h-full w-[80vw] max-w-[320px] translate-x-0 border-r border-zinc-800/40 shadow-[4px_0_28px_rgba(0,0,0,0.55)]",
-            "md:relative md:top-auto md:left-auto md:z-auto md:h-full md:max-w-none md:w-auto md:shrink-0 md:translate-x-0 md:shadow-none",
-            isSidebarOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full max-md:pointer-events-none",
+            "relative shrink-0 transition-[width] duration-300 ease-out",
+            "max-md:w-0 max-md:min-w-0 max-md:max-w-0 max-md:overflow-visible",
+            "md:flex md:h-full md:min-h-0 md:flex-col md:overflow-hidden",
             isSidebarOpen && isMdUp ? "md:border-r md:border-zinc-800/40" : "",
             !isSidebarOpen && isMdUp && "md:pointer-events-none md:border-r-0",
           )}
           style={isMdUp ? { width: isSidebarOpen ? sidebarWidth : 0 } : undefined}
         >
+          <div
+            className={cn(
+              "relative flex h-full min-h-0 w-full flex-1 flex-col bg-zinc-950 transition-[width] duration-300 ease-out",
+              // Mobile drawer: out of flex width calculation (parent is w-0)
+              "max-md:fixed max-md:top-0 max-md:left-0 max-md:z-50 max-md:h-full max-md:w-[80vw] max-md:max-w-[320px] max-md:border-r max-md:border-zinc-800/40 max-md:shadow-[4px_0_28px_rgba(0,0,0,0.55)]",
+              !isMdUp && !isSidebarOpen && "max-md:hidden",
+              "md:relative md:inset-auto md:z-auto md:max-w-none md:shadow-none",
+            )}
+          >
           <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden">
             <FileSidebar
               width={sidebarWidth}
@@ -901,6 +913,7 @@ export default function Home() {
               <X size={18} strokeWidth={2} className="shrink-0" />
             </button>
           ) : null}
+          </div>
         </div>
 
         {/* PC sidebar toggle — never inside the clipped sidebar panel; sibling in the flex row */}
@@ -940,7 +953,11 @@ export default function Home() {
           />
         )}
 
-        <div ref={memoWorkspaceRef} data-memo-workspace className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div
+          ref={memoWorkspaceRef}
+          data-memo-workspace
+          className="relative z-0 flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-x-hidden overflow-y-hidden"
+        >
           <div className="flex h-10 shrink-0 items-center gap-2 border-b border-zinc-800/50 bg-zinc-950/95 px-2 md:hidden">
             <button
               type="button"
