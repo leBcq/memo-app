@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import CommandPalette, { type CommandPick } from "@/components/CommandPalette";
 import NodeList from "@/components/Editor/NodeList";
+import { MobileOutlineActionsSheet } from "@/components/MobileOutlineActionsSheet";
 import { MobileNodeEditorToolbar } from "@/components/Editor/MobileNodeEditorToolbar";
 import Toolbar from "@/components/Editor/Toolbar";
 import { FileSidebar } from "@/components/FileSidebar";
@@ -18,6 +19,7 @@ import { matchesKeybind } from "@/config/keybinds";
 import { useSettings } from "@/contexts/SettingsContext";
 import { findNodePath } from "@/lib/treeUtils";
 import { cn } from "@/lib/utils";
+import { attachChromeProofTap } from "@/lib/chromeProofPointerHandlers";
 import {
   getMemoThemeColor,
   fileItemColorThemeChromeAlphaMultiplier,
@@ -25,7 +27,7 @@ import {
   EDITOR_STANDARD_TEXT_COLOR,
   EDITOR_STANDARD_CARET_COLOR,
 } from "@/lib/memoThemeColor";
-import { Menu, MousePointer2, X } from "lucide-react";
+import { Menu, MoreVertical, X } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useVisualViewportBottomInsetPx } from "@/hooks/useVisualViewportBottomInsetPx";
 import { useMobileUiStore } from "@/stores/mobileUiStore";
@@ -85,6 +87,21 @@ function collectSelectedText(nodes: NoteNode[], selected: Set<string>, depth = 0
     if (childLines) lines.push(childLines);
   }
   return lines.join("\n");
+}
+
+/** IDs in `selected` that are not descendants of another selected node (for safe bulk delete). */
+function selectionRootIdsAmong(tree: NoteNode[], selected: Set<string>): string[] {
+  const roots: string[] = [];
+  const walk = (list: NoteNode[], ancestorSelected: boolean) => {
+    for (const n of list) {
+      const sel = selected.has(n.id);
+      const anc = ancestorSelected || sel;
+      if (sel && !ancestorSelected) roots.push(n.id);
+      walk(n.children, anc);
+    }
+  };
+  walk(tree, false);
+  return roots;
 }
 
 /** All note block roots in visual DOM order (one entry per node). */
@@ -212,6 +229,7 @@ export default function Home() {
 
   // ── Multi-node block selection (explicit state; not browser text selection) ──
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [mobileOutlineSheetOpen, setMobileOutlineSheetOpen] = useState(false);
   const isDragSelectRef = useRef(false);
   /** Anchor for Shift+click range and drag-to-select */
   const selectionAnchorRef = useRef<string | null>(null);
@@ -338,6 +356,7 @@ export default function Home() {
     toggleCollapsed,
     addChild,
     addSibling,
+    insertSiblingWithPlainTextAfter,
     addRootNode,
     removeNode,
     deleteNodeAndFocusPrev,
@@ -441,9 +460,6 @@ export default function Home() {
     !activeMemoReadOnly &&
     !effectiveSelectionMode &&
     mobileOutlineToolbarTargetNode !== null;
-
-  const mobileSelectionFabBottomPx =
-    visualViewportKeyboardInsetPx + (mobileOutlineEditorToolbarVisible ? 64 + 54 : 80);
 
   const handleFocusNode = useCallback((id: string) => {
     const target = findNodeById(nodes, id);
@@ -559,6 +575,9 @@ export default function Home() {
     setMobileOutlineEditorBarNodeId(null);
   }, [activeMemoId]);
   useEffect(() => { setSelectedIds([]); selectionAnchorRef.current = null; }, [activeMemoId]);
+  useEffect(() => {
+    setMobileOutlineSheetOpen(false);
+  }, [activeMemoId]);
   useEffect(() => {
     setMobileSelectionMode(false);
     setMobileRichTextToolbarOpen(false);
@@ -791,6 +810,74 @@ export default function Home() {
     blockSelectPointerRef.current = null;
     blockSelectRangeDragRef.current = false;
   }, []);
+
+  const mobileOutlineActionsAnchorId = useMemo(() => {
+    if (selectedIds.length === 1) return selectedIds[0];
+    return activeId ?? mobileOutlineEditorBarNodeId ?? null;
+  }, [selectedIds, activeId, mobileOutlineEditorBarNodeId]);
+
+  const mobileActionsCopy = useCallback(async () => {
+    const text = collectSelectedText(displayNodes, new Set(selectedIds));
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      window.alert(t("mobile.actionsMenu.clipboardDenied"));
+    }
+    setMobileOutlineSheetOpen(false);
+  }, [selectedIds, displayNodes, t]);
+
+  const mobileActionsCut = useCallback(async () => {
+    const text = collectSelectedText(displayNodes, new Set(selectedIds));
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      window.alert(t("mobile.actionsMenu.clipboardDenied"));
+      return;
+    }
+    const roots = selectionRootIdsAmong(displayNodes, new Set(selectedIds));
+    const order = getDomOrderedNodeIds();
+    roots.sort((a, b) => order.indexOf(b) - order.indexOf(a));
+    for (const id of roots) removeNode(id);
+    setSelectedIds([]);
+    setMobileOutlineSheetOpen(false);
+  }, [selectedIds, displayNodes, removeNode, t]);
+
+  const mobileActionsPaste = useCallback(async () => {
+    const anchor = mobileOutlineActionsAnchorId;
+    if (!anchor) return;
+    try {
+      const text = await navigator.clipboard.readText();
+      insertSiblingWithPlainTextAfter(anchor, text);
+    } catch {
+      window.alert(t("mobile.actionsMenu.clipboardDenied"));
+    }
+    setMobileOutlineSheetOpen(false);
+  }, [mobileOutlineActionsAnchorId, insertSiblingWithPlainTextAfter, t]);
+
+  const mobileActionsFocusTarget = useCallback(() => {
+    const id = mobileOutlineActionsAnchorId;
+    if (!id) return;
+    handleFocusNode(id);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('[data-geo-editor="focus-title"]')?.focus();
+    });
+    setMobileOutlineSheetOpen(false);
+  }, [mobileOutlineActionsAnchorId, handleFocusNode]);
+
+  const mobileActionsDeleteSelection = useCallback(() => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(t("mobile.actionsMenu.deleteConfirm"))) return;
+    const roots = selectionRootIdsAmong(displayNodes, new Set(selectedIds));
+    const order = getDomOrderedNodeIds();
+    roots.sort((a, b) => order.indexOf(b) - order.indexOf(a));
+    for (const id of roots) removeNode(id);
+    setSelectedIds([]);
+    setMobileOutlineSheetOpen(false);
+  }, [selectedIds, displayNodes, removeNode, t]);
+
+  const mobileOutlineFabTap = attachChromeProofTap({
+    onActivate: () => setMobileOutlineSheetOpen((open) => !open),
+  });
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1374,6 +1461,7 @@ export default function Home() {
                 onConvertToPluginCard={convertNodeToPluginCard}
                 onConvertToGameSpecCard={convertNodeToGameSpecCard}
                 suppressFloatingContextMenu={!isMdUp}
+                mobileTapToggleOverlay={!isMdUp && effectiveSelectionMode}
               />
             </div>
           </div>
@@ -1392,21 +1480,37 @@ export default function Home() {
         </div>
       </div>
       </div>
+
+      <MobileOutlineActionsSheet
+        open={mobileOutlineSheetOpen}
+        onClose={() => setMobileOutlineSheetOpen(false)}
+        readOnly={activeMemoReadOnly}
+        isMobileSelectionMode={isMobileSelectionMode}
+        selectedCount={selectedIds.length}
+        canPasteAnchor={Boolean(mobileOutlineActionsAnchorId)}
+        hasFocusTarget={Boolean(mobileOutlineActionsAnchorId)}
+        onToggleSelectionMode={() => toggleMobileSelectionMode()}
+        onCopy={mobileActionsCopy}
+        onCut={mobileActionsCut}
+        onPaste={mobileActionsPaste}
+        onFocusTargetNode={mobileActionsFocusTarget}
+        onDeleteSelection={mobileActionsDeleteSelection}
+      />
+
       <button
-        type="button"
-        onClick={() => toggleMobileSelectionMode()}
-        title={t("mobile.selectionModeHint")}
-        aria-pressed={isMobileSelectionMode}
-        aria-label={t("mobile.selectionMode")}
-        style={{ bottom: mobileSelectionFabBottomPx }}
+        {...mobileOutlineFabTap}
+        aria-expanded={mobileOutlineSheetOpen}
+        aria-haspopup="dialog"
+        aria-label={t("mobile.actionsMenu.openFabAria")}
+        title={t("mobile.actionsMenu.openFabAria")}
         className={cn(
-          "fixed right-4 z-[88] flex h-12 w-12 touch-manipulation items-center justify-center rounded-md border shadow-[0_8px_30px_rgba(0,0,0,0.4)] md:hidden",
-          isMobileSelectionMode
+          "fixed bottom-24 right-4 z-[93] flex h-12 w-12 touch-manipulation items-center justify-center rounded-md border shadow-[0_8px_30px_rgba(0,0,0,0.4)] md:hidden",
+          isMobileSelectionMode || mobileOutlineSheetOpen
             ? "border-cyan-400/55 bg-cyan-950/45 text-cyan-200 shadow-cyan-500/15"
             : "border-zinc-600/80 bg-zinc-900/95 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200",
         )}
       >
-        <MousePointer2 size={22} strokeWidth={1.75} />
+        <MoreVertical size={22} strokeWidth={1.75} aria-hidden />
       </button>
 
       <CloudSyncIndicator
