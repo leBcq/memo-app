@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, MoreHorizontal } from "lucide-react";
 import type { MemoMusicMeta } from "@/types/memoKind";
 import { clampBpm, keyQualityToScale, scaleToKeyQuality } from "@/types/memoKind";
 import { NOTE_ROOTS } from "@/types/song";
@@ -46,6 +46,8 @@ export function TrackStatusBar({
   const [bpmOpen, setBpmOpen] = useState(false);
   const [keyOpen, setKeyOpen] = useState(false);
   const [releaseOpen, setReleaseOpen] = useState(false);
+  const [mobileExtrasOpen, setMobileExtrasOpen] = useState(false);
+  const mobileExtrasRef = useRef<HTMLDivElement>(null);
   const bpmInputRef = useRef<HTMLInputElement>(null);
   const bpmDragRef = useRef<{ y: number; bpm: number } | null>(null);
   const keyQ = scaleToKeyQuality(meta.scale);
@@ -54,7 +56,22 @@ export function TrackStatusBar({
     setBpmOpen(false);
     setKeyOpen(false);
     setReleaseOpen(false);
+    setMobileExtrasOpen(false);
   }, []);
+
+  useEffect(() => {
+    if (!mobileExtrasOpen) return;
+    const onDoc = (e: MouseEvent | TouchEvent) => {
+      if (mobileExtrasRef.current?.contains(e.target as Node)) return;
+      setMobileExtrasOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc, true);
+    document.addEventListener("touchstart", onDoc, true);
+    return () => {
+      document.removeEventListener("mousedown", onDoc, true);
+      document.removeEventListener("touchstart", onDoc, true);
+    };
+  }, [mobileExtrasOpen]);
 
   const commitBpm = useCallback(
     (raw: string) => {
@@ -100,12 +117,12 @@ export function TrackStatusBar({
     if (bpmOpen) requestAnimationFrame(() => bpmInputRef.current?.select());
   }, [bpmOpen]);
 
-  const anyMenuOpen = bpmOpen || keyOpen || releaseOpen;
+  const anyMenuOpen = bpmOpen || keyOpen || releaseOpen || mobileExtrasOpen;
 
   return (
     <div
       className={cn(
-        "relative z-[100] flex h-9 shrink-0 flex-col",
+        "relative z-[100] flex min-h-9 shrink-0 flex-col md:h-9",
         "bg-zinc-950/95 font-mono text-[11px]",
         "shadow-[inset_0_1px_0_rgba(6,182,212,0.06)]",
         readOnly && "pointer-events-none select-none opacity-[0.72]",
@@ -124,7 +141,7 @@ export function TrackStatusBar({
         />
       )}
 
-      <div className="relative z-10 flex min-h-9 min-w-0 flex-1 items-stretch border-b border-zinc-800/80">
+      <div className="relative z-10 flex min-h-9 min-w-0 flex-1 flex-wrap items-stretch gap-y-px border-b border-zinc-800/80">
         <div
           className="relative flex shrink-0 items-center gap-2 px-3"
           style={modeStripBadgeCellStyle(themeColor, chrome, noTintChrome)}
@@ -136,7 +153,7 @@ export function TrackStatusBar({
             style={modeStripBadgeDiamondStyle(themeColor, chrome, noTintChrome)}
           />
           <span
-            className="shrink-0 text-[9px] tracking-[2.5px]"
+            className="shrink-0 whitespace-nowrap text-[9px] tracking-[2.5px]"
             style={modeStripBadgeLabelStyle(themeColor, chrome, noTintChrome)}
           >
             {t("music.stripLabel")}
@@ -164,7 +181,7 @@ export function TrackStatusBar({
             )}
             title={t("music.bpmInputHint")}
           >
-            <span className="text-[9px] tracking-[2px] text-zinc-600">{t("music.bpm")}</span>
+            <span className="whitespace-nowrap text-[9px] tracking-[2px] text-zinc-600">{t("music.bpm")}</span>
             <span className="tabular-nums text-zinc-100 drop-shadow-[0_0_6px_rgba(250,250,250,0.08)]">
               {meta.bpm}
             </span>
@@ -243,7 +260,7 @@ export function TrackStatusBar({
         </div>
 
         {onInsertStructure && (
-          <div className="relative z-20 flex items-center border-l border-zinc-800/80">
+          <div className="relative z-20 hidden items-center border-l border-zinc-800/80 md:flex">
             <button
               type="button"
               onMouseDown={(e) => e.stopPropagation()}
@@ -253,20 +270,20 @@ export function TrackStatusBar({
                 onInsertStructure();
               }}
               className={cn(
-                "h-full px-2.5 text-left transition-colors",
+                "flex min-h-9 flex-col justify-center px-2.5 py-1 text-left transition-colors",
                 "text-[8px] leading-tight tracking-[0.12em] text-zinc-500",
                 "hover:bg-fuchsia-950/20 hover:text-fuchsia-200/90",
               )}
               title={t("music.insertTitle")}
             >
-              <span className="block font-medium text-zinc-400">{t("music.insertStructure")}</span>
-              <span className="block text-[7px] tracking-wide text-zinc-600">{t("music.insertStructureSub")}</span>
+              <span className="block whitespace-nowrap font-medium text-zinc-400">{t("music.insertStructure")}</span>
+              <span className="block whitespace-nowrap text-[7px] tracking-wide text-zinc-600">{t("music.insertStructureSub")}</span>
             </button>
           </div>
         )}
 
         {onAddPlugin && (
-          <div className="relative z-20 flex items-center border-l border-zinc-800/80">
+          <div className="relative z-20 hidden items-center border-l border-zinc-800/80 md:flex">
             <button
               type="button"
               onMouseDown={(e) => e.stopPropagation()}
@@ -276,15 +293,72 @@ export function TrackStatusBar({
                 onAddPlugin();
               }}
               className={cn(
-                "h-full px-2.5 text-left transition-colors",
+                "flex min-h-9 flex-col justify-center px-2.5 py-1 text-left transition-colors",
                 "text-[8px] leading-tight tracking-[0.12em] text-zinc-500",
                 "hover:bg-violet-950/25 hover:text-violet-200/90",
               )}
               title={t("music.addPluginTitle")}
             >
-              <span className="block font-medium text-zinc-400">{t("music.addPlugin")}</span>
-              <span className="block text-[7px] tracking-wide text-zinc-600">{t("music.addPluginSub")}</span>
+              <span className="block whitespace-nowrap font-medium text-zinc-400">{t("music.addPlugin")}</span>
+              <span className="block whitespace-nowrap text-[7px] tracking-wide text-zinc-600">{t("music.addPluginSub")}</span>
             </button>
+          </div>
+        )}
+
+        {(onInsertStructure || onAddPlugin) && (
+          <div ref={mobileExtrasRef} className="relative z-30 flex shrink-0 border-l border-zinc-800/80 md:hidden">
+            <button
+              type="button"
+              aria-expanded={mobileExtrasOpen}
+              aria-haspopup="true"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMobileExtrasOpen((o) => !o);
+              }}
+              className={cn(
+                "flex min-h-11 min-w-11 shrink-0 items-center justify-center text-zinc-400 transition-colors",
+                mobileExtrasOpen ? "bg-zinc-800/80 text-cyan-300" : "hover:bg-zinc-900 hover:text-zinc-200",
+              )}
+              title={t("music.insertTitle")}
+            >
+              <MoreHorizontal size={18} strokeWidth={2} aria-hidden />
+            </button>
+            {mobileExtrasOpen && (
+              <div
+                className="absolute right-0 top-full z-[140] mt-px min-w-[200px] border border-zinc-700/70 bg-zinc-950 py-1 shadow-[0_12px_40px_rgba(0,0,0,0.55)]"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {onInsertStructure && (
+                  <button
+                    type="button"
+                    className="flex w-full flex-col px-3 py-2 text-left whitespace-nowrap hover:bg-fuchsia-950/20"
+                    onClick={() => {
+                      setMobileExtrasOpen(false);
+                      closeAllMenus();
+                      onInsertStructure();
+                    }}
+                  >
+                    <span className="text-[11px] font-medium text-fuchsia-200/90">{t("music.insertStructure")}</span>
+                    <span className="text-[9px] text-zinc-500">{t("music.insertStructureSub")}</span>
+                  </button>
+                )}
+                {onAddPlugin && (
+                  <button
+                    type="button"
+                    className="flex w-full flex-col px-3 py-2 text-left whitespace-nowrap hover:bg-violet-950/25"
+                    onClick={() => {
+                      setMobileExtrasOpen(false);
+                      closeAllMenus();
+                      onAddPlugin();
+                    }}
+                  >
+                    <span className="text-[11px] font-medium text-violet-200/90">{t("music.addPlugin")}</span>
+                    <span className="text-[9px] text-zinc-500">{t("music.addPluginSub")}</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -303,7 +377,7 @@ export function TrackStatusBar({
               keyOpen ? "bg-fuchsia-950/25 text-fuchsia-200" : "text-zinc-500 hover:text-zinc-200",
             )}
           >
-            <span className="text-[9px] tracking-[2px] text-zinc-600">{t("music.key")}</span>
+            <span className="whitespace-nowrap text-[9px] tracking-[2px] text-zinc-600">{t("music.key")}</span>
             <span className="shrink-0 text-zinc-100">{meta.key}</span>
             <span
               className={cn(

@@ -461,11 +461,7 @@ export default function NoteNode({
 
   return (
     <div
-      className={cn(
-        "w-full overflow-visible rounded-sm",
-        showBlockHighlight && "bg-cyan-500/20 ring-1 ring-inset ring-cyan-500/40",
-        isSelectionMode && "select-none",
-      )}
+      className={cn("w-full overflow-visible rounded-sm", isSelectionMode && "select-none")}
       data-geo-block="note-node"
       data-node-id={node.id}
       onMouseEnter={() => setIsHovered(true)}
@@ -482,10 +478,20 @@ export default function NoteNode({
         if (!isSelectionMode) return;
         const target = e.target as HTMLElement;
         if (target.closest("button")) return;
+        // Capture runs on ancestors first; only handle touches whose innermost note-node is this row.
+        const innermost = target.closest('[data-geo-block="note-node"]');
+        if (innermost !== e.currentTarget) return;
         e.preventDefault();
         onMobileSelectNode?.(node.id);
       }}
     >
+      {/* Highlight only this node's row (+ note strip), not nested child nodes (avoids "whole subtree" box). */}
+      <div
+        className={cn(
+          "rounded-sm",
+          showBlockHighlight && "bg-cyan-500/20 ring-1 ring-inset ring-cyan-500/40",
+        )}
+      >
         <div ref={contentRowRef} className="relative w-full overflow-visible">
           <div
             className={cn(
@@ -816,6 +822,7 @@ export default function NoteNode({
             )}
           </div>
         </div>
+        </div>
 
         {menuOpen && menuAnchorRect && (
           <NodeContextMenu
@@ -851,7 +858,6 @@ export default function NoteNode({
             }
           />
         )}
-      </div>
 
       {node.note !== null && (
         <div
@@ -883,6 +889,8 @@ export default function NoteNode({
           />
         </div>
       )}
+
+      </div>
 
       {hasChildren && (
         <div className="relative" style={{ paddingLeft: "20px" }}>

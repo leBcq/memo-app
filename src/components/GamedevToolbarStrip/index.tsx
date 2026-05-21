@@ -37,7 +37,7 @@ export function GamedevToolbarStrip({
   return (
     <div
       className={cn(
-        "relative z-[100] flex h-9 shrink-0 items-stretch",
+        "relative z-[100] flex min-h-9 shrink-0 items-stretch md:h-9",
         "bg-zinc-950/95 font-mono text-[11px]",
         "shadow-[inset_0_1px_0_rgba(6,182,212,0.06)]",
         readOnly && "pointer-events-none select-none opacity-[0.72]",
@@ -54,7 +54,7 @@ export function GamedevToolbarStrip({
           style={modeStripBadgeDiamondStyle(themeColor, chrome, noTintChrome)}
         />
         <span
-          className="shrink-0 text-[9px] tracking-[2.5px]"
+          className="shrink-0 whitespace-nowrap text-[9px] tracking-[2.5px]"
           style={modeStripBadgeLabelStyle(themeColor, chrome, noTintChrome)}
         >
           {t("gamedev.stripLabel")}
@@ -75,7 +75,7 @@ export function GamedevToolbarStrip({
             onAddSpecCard();
           }}
           className={cn(
-            "flex h-full items-center gap-2 px-2.5 transition-colors",
+            "flex min-h-11 w-full flex-wrap items-center gap-2 px-2.5 py-2 transition-colors md:min-h-0 md:h-full md:flex-nowrap md:py-0",
             "text-[8px] leading-tight tracking-[0.14em] text-zinc-500",
             "hover:bg-zinc-900/80",
           )}
@@ -87,10 +87,10 @@ export function GamedevToolbarStrip({
             strokeWidth={2}
             style={{ color: solidAccent, opacity: 1 }}
           />
-          <span className="font-medium" style={{ color: solidAccent }}>
+          <span className="whitespace-nowrap font-medium" style={{ color: solidAccent }}>
             {t("gamedev.addSpecCard")}
           </span>
-          <span className="hidden text-[7px] tracking-wide text-zinc-600 sm:inline">
+          <span className="hidden whitespace-nowrap text-[7px] tracking-wide text-zinc-600 sm:inline">
             {t("gamedev.addSpecSub")}
           </span>
         </button>

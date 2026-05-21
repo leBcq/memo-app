@@ -972,10 +972,10 @@ export default function Home() {
             </span>
           </div>
 
-          {/* Mode strip: music tools or gamedev spec tools (fixed h-9). */}
+          {/* Mode strip: music tools or gamedev spec tools */}
           <div
             className={cn(
-              "relative z-30 h-9 shrink-0 overflow-visible transition-[border-color,background-color] duration-300 ease-in-out",
+              "relative z-30 min-h-9 shrink-0 overflow-visible md:h-9 transition-[border-color,background-color] duration-300 ease-in-out",
               (activeMemo.memoType === "music" && activeMemo.musicMeta) || activeMemo.memoType === "gamedev"
                 ? "bg-zinc-950/95"
                 : "border-b border-zinc-800/35 bg-zinc-950",
@@ -1004,7 +1004,7 @@ export default function Home() {
                 readOnly={activeMemoReadOnly}
               />
             ) : (
-              <div className="h-9 w-full" aria-hidden />
+              <div className="min-h-9 w-full md:h-9" aria-hidden />
             )}
           </div>
 

@@ -86,7 +86,7 @@ export function SidebarAuthBar() {
           type="button"
           onClick={() => setMenuOpen((v) => !v)}
           className={cn(
-            "flex w-full items-center gap-2 rounded-md border p-1.5 text-left transition-colors",
+            "flex min-h-[44px] w-full items-center gap-2 rounded-md border px-3 py-2 text-left transition-colors md:min-h-0 md:p-1.5",
             "border-zinc-700/50 bg-zinc-900/60 shadow-[inset_0_0_0_1px_rgba(6,182,212,0.06)]",
             menuOpen
               ? "border-cyan-500/45 bg-zinc-900/90 ring-1 ring-cyan-500/25"
@@ -135,10 +135,10 @@ export function SidebarAuthBar() {
             )}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <button
-              type="button"
-              role="menuitem"
-              className="flex w-full items-center gap-2 px-2.5 py-2 text-left text-[10px] tracking-wide text-zinc-300 transition-colors hover:bg-fuchsia-950/35 hover:text-fuchsia-200"
+        <button
+          type="button"
+          role="menuitem"
+          className="flex min-h-[44px] w-full items-center gap-2 px-3 py-3 text-left text-[12px] font-mono tracking-wide text-zinc-300 transition-colors hover:bg-fuchsia-950/35 hover:text-fuchsia-200 md:min-h-0 md:px-2.5 md:py-2 md:text-[10px]"
               onClick={() => {
                 closeMenu();
                 void signOut();
@@ -158,8 +158,8 @@ export function SidebarAuthBar() {
       type="button"
       onClick={() => void signInWithGoogle()}
       className={cn(
-        "group flex w-full items-center justify-center gap-2 rounded-md border px-2.5 py-2",
-        "border-cyan-500/35 bg-zinc-950/80 font-mono text-[10px] tracking-[0.12em] text-cyan-100/95",
+        "group flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border px-4 py-2.5 md:min-h-0 md:px-2.5 md:py-2",
+        "border-cyan-500/35 bg-zinc-950/80 font-mono text-[12px] tracking-[0.12em] text-cyan-100/95 md:text-[10px]",
         "shadow-[inset_0_0_0_1px_rgba(6,182,212,0.08),0_0_20px_rgba(6,182,212,0.04)]",
         "transition-colors duration-150",
         "hover:border-fuchsia-400/45 hover:bg-cyan-950/25 hover:text-fuchsia-100/95 hover:shadow-[inset_0_0_0_1px_rgba(192,38,211,0.15)]",

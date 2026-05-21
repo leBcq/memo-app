@@ -60,8 +60,8 @@ function KeymapRow({
   };
 
   return (
-    <div className="flex items-center justify-between border border-zinc-800/70 bg-zinc-900/30 px-4 py-3">
-      <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col gap-3 rounded-sm border border-zinc-800/70 bg-zinc-900/30 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="text-[11px] tracking-wide text-zinc-200">{label}</span>
         <span className="text-[10px] text-zinc-600">{desc}</span>
       </div>
@@ -74,14 +74,14 @@ function KeymapRow({
           placeholder={t("settings.keymap.capture")}
           onKeyDown={handleKeyDown}
           onBlur={onCancelCapture}
-          className="w-[116px] border border-cyan-500/60 bg-cyan-950/20 px-3 py-1.5 font-mono text-[11px] text-cyan-400 outline-none ring-1 ring-cyan-500/30 placeholder:animate-pulse placeholder:text-cyan-400/60"
+          className="w-full min-h-11 shrink-0 border border-cyan-500/60 bg-cyan-950/20 px-3 py-2 font-mono text-[11px] text-cyan-400 outline-none ring-1 ring-cyan-500/30 placeholder:animate-pulse placeholder:text-cyan-400/60 sm:w-[116px]"
         />
       ) : (
         <button
           type="button"
           onClick={onStartCapture}
           title={t("settings.keymap.rebindTitle")}
-          className="group flex w-[116px] items-center justify-center border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-[11px] transition-colors hover:border-cyan-600/50 hover:bg-zinc-800"
+          className="group flex min-h-11 w-full shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900 px-3 py-2 text-[11px] transition-colors hover:border-cyan-600/50 hover:bg-zinc-800 sm:w-[116px] sm:min-h-0 sm:py-1.5"
         >
           <kbd className="font-mono text-zinc-300 group-hover:text-cyan-300">
             {keyComboToLabel(currentCombo)}
@@ -441,47 +441,87 @@ export function SettingsModal({ onClose, onExportFullBackup }: Props) {
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm"
-      onMouseDown={(e) => { if (e.target === overlayRef.current) onClose(); }}
+      className="fixed inset-0 z-[10000] flex flex-col bg-black/70 p-3 pb-10 backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:p-6 sm:pb-6 md:p-8"
+      onMouseDown={(e) => {
+        if (e.target === overlayRef.current) onClose();
+      }}
     >
-      <div className="relative flex h-[580px] w-[800px] max-h-[90vh] max-w-[96vw] border border-zinc-700/80 bg-zinc-950 font-mono shadow-2xl shadow-black/80">
-        {/* Corner accents */}
-        <div className="pointer-events-none absolute -left-px -top-px h-6 w-6 border-l-2 border-t-2 border-cyan-500/40" />
-        <div className="pointer-events-none absolute -right-px -top-px h-6 w-6 border-r-2 border-t-2 border-cyan-500/40" />
-        <div className="pointer-events-none absolute -bottom-px -left-px h-6 w-6 border-b-2 border-l-2 border-cyan-500/40" />
-        <div className="pointer-events-none absolute -bottom-px -right-px h-6 w-6 border-b-2 border-r-2 border-cyan-500/40" />
+      <div
+        className={cn(
+          "relative flex min-h-0 w-full flex-1 flex-col overflow-hidden border border-zinc-700/80 bg-zinc-950 font-mono shadow-2xl shadow-black/80",
+          "max-h-[min(92vh,780px)] sm:max-h-[90vh]",
+          "md:h-[580px] md:max-h-[90vh] md:w-[800px] md:max-w-[96vw] md:flex-row md:flex-none",
+        )}
+      >
+        {/* Corner accents — desktop */}
+        <div className="pointer-events-none absolute -left-px -top-px hidden h-6 w-6 border-l-2 border-t-2 border-cyan-500/40 md:block" />
+        <div className="pointer-events-none absolute -right-px -top-px hidden h-6 w-6 border-r-2 border-t-2 border-cyan-500/40 md:block" />
+        <div className="pointer-events-none absolute -bottom-px -left-px hidden h-6 w-6 border-b-2 border-l-2 border-cyan-500/40 md:block" />
+        <div className="pointer-events-none absolute -bottom-px -right-px hidden h-6 w-6 border-b-2 border-r-2 border-cyan-500/40 md:block" />
 
-        {/* Tab sidebar */}
-        <div className="flex w-44 shrink-0 flex-col border-r border-zinc-800/70 bg-zinc-900/30 py-3">
+        {/* Mobile tabs (top rail) */}
+        <div className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-zinc-800/70 bg-zinc-900/40 px-2 py-2 touch-pan-x md:hidden">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-sm border px-3 py-2 text-[12px] font-mono tracking-wide whitespace-nowrap",
+                activeTab === tab.id
+                  ? "border-cyan-500/50 bg-cyan-950/30 text-cyan-200"
+                  : "border-transparent text-zinc-500 hover:bg-zinc-900/65 hover:text-zinc-300",
+              )}
+            >
+              <span className="text-[14px]" aria-hidden>
+                {tab.icon}
+              </span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Desktop tab sidebar */}
+        <div className="hidden h-full min-h-0 w-44 shrink-0 flex-col border-r border-zinc-800/70 bg-zinc-900/30 py-3 md:flex">
           <div className="mb-3 px-4 text-[9px] tracking-[3px] text-zinc-600">{t("settings.title")}</div>
           {tabs.map((tab) => (
-            <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
               className={cn(
                 "flex items-center gap-2.5 border-l-2 px-4 py-2.5 text-left text-[11px] tracking-wide transition-all duration-150",
                 activeTab === tab.id
                   ? "border-cyan-500/60 bg-cyan-950/20 text-cyan-300 [box-shadow:inset_2px_0_8px_rgba(6,182,212,0.06)]"
                   : "border-transparent text-zinc-500 hover:border-zinc-700/50 hover:bg-zinc-900/50 hover:text-zinc-300",
-              )}>
+              )}
+            >
               <span className="text-[13px]">{tab.icon}</span>
               <span>{tab.label}</span>
             </button>
           ))}
-          <div className="mt-auto border-t border-zinc-800/60 px-4 pt-3 text-[9px] text-zinc-700">
-            {t("settings.version")}
-          </div>
+          <div className="mt-auto border-t border-zinc-800/60 px-4 pt-3 text-[9px] text-zinc-700">{t("settings.version")}</div>
         </div>
 
-        {/* Content */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b border-zinc-800/70 px-6 py-3">
-            <span className="text-[9px] tracking-[3px] text-zinc-600">
-              {tabs.find((x) => x.id === activeTab)?.label.toUpperCase()}
+        {/* Content column */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-[48px] shrink-0 items-center justify-between gap-2 border-b border-zinc-800/70 px-3 py-2 sm:px-6 sm:py-3">
+            <span className="min-w-0 truncate whitespace-nowrap text-[11px] tracking-wide text-zinc-600 sm:text-[9px] sm:tracking-[3px]">
+              <span className="md:hidden">{tabs.find((x) => x.id === activeTab)?.label}</span>
+              <span className="hidden md:inline">
+                {tabs.find((x) => x.id === activeTab)?.label.toUpperCase()}
+              </span>
             </span>
-            <button type="button" onClick={onClose}
-              className="flex h-5 w-5 items-center justify-center text-[10px] text-zinc-600 transition-colors hover:text-zinc-300"
-              aria-label={t("settings.close")}>✕</button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-sm text-[14px] text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-200 md:h-9 md:w-9 md:text-[10px]"
+              aria-label={t("settings.close")}
+            >
+              ✕
+            </button>
           </div>
-          <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-4 sm:px-6 sm:py-5">
             {renderContent()}
           </div>
         </div>

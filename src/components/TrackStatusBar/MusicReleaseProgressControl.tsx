@@ -44,7 +44,7 @@ export function MusicReleaseProgressControl({
   }, [open, onOpenChange]);
 
   return (
-    <div ref={rootRef} className="relative z-20 flex min-w-0 shrink-0 items-stretch border-l border-zinc-800/80">
+    <div ref={rootRef} className="relative z-20 flex min-w-0 shrink-0 items-stretch border-l border-zinc-800/80 max-md:flex-1">
       <button
         type="button"
         onMouseDown={(e) => e.stopPropagation()}
@@ -54,19 +54,19 @@ export function MusicReleaseProgressControl({
           onOpenChange(!open);
         }}
         className={cn(
-          "flex h-full min-w-[148px] items-center gap-2 px-3 transition-colors",
+          "flex min-h-11 min-w-0 flex-1 items-center gap-2 px-2 md:min-h-0 md:h-full md:min-w-[148px]",
           open ? "bg-emerald-950/20 text-emerald-200/95" : "text-zinc-500 hover:text-zinc-200",
         )}
         title={t("music.releaseTitle")}
       >
-        <span className="text-[9px] tracking-[2px] text-zinc-600">{t("music.releaseBtn")}</span>
+        <span className="shrink-0 whitespace-nowrap text-[9px] tracking-[2px] text-zinc-600">{t("music.releaseBtn")}</span>
         <div
           className="h-[5px] w-[5px] shrink-0 rotate-45 shadow-[0_0_8px_currentColor]"
           style={{ background: color, color }}
           aria-hidden
         />
         <span
-          className="min-w-0 truncate text-[10px] font-medium tracking-wide tabular-nums text-zinc-100"
+          className="min-w-0 flex-1 truncate text-[10px] font-medium tracking-wide tabular-nums text-zinc-100"
           style={{ textShadow: `0 0 12px ${color}22` }}
         >
           {status}

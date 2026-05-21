@@ -35,6 +35,13 @@ import {
 
 const DRAG_TYPE = "application/geo-memo-item";
 
+/** Touch-friendly row chrome on small screens (WCAG ~44px min height). */
+const SIDEBAR_ROW_CLASS =
+  "py-[3px] font-mono tracking-wide max-md:min-h-[44px] max-md:items-center max-md:py-2.5 max-md:text-[15px] md:py-[3px] md:text-[11px]";
+
+const SIDEBAR_MOBILE_FOOTER_BTN =
+  "min-h-[44px] py-2.5 text-[13px] leading-snug md:min-h-0 md:py-1 md:text-[10px]";
+
 function parseDragPayload(raw: string): string[] {
   if (!raw) return [];
   try {
@@ -462,7 +469,8 @@ function FavoriteItemRow({
         onDragEnd={onRowDragEnd}
         className={cn(
           labelClass,
-          "group flex w-full min-w-0 items-center gap-1.5 py-[3px] pr-2 font-mono text-[11px] tracking-wide transition-colors active:cursor-grabbing",
+          "group flex w-full min-w-0 items-center gap-1.5 pr-2 transition-colors active:cursor-grabbing",
+          SIDEBAR_ROW_CLASS,
           isFolder ? "cursor-pointer" : "cursor-grab",
           isDragging && "opacity-40",
         )}
@@ -604,7 +612,7 @@ function SharedWithMeSection({
         type="button"
         onClick={() => setSectionOpen((p) => !p)}
         onContextMenu={(e) => e.stopPropagation()}
-        className="flex w-full items-center gap-1.5 px-3 py-1.5 font-mono text-[9px] tracking-[2px] text-zinc-500 transition-colors hover:text-zinc-300"
+        className="flex min-h-[44px] w-full items-center gap-1.5 px-3 py-2.5 font-mono text-[12px] tracking-[2px] text-zinc-500 transition-colors hover:text-zinc-300 md:min-h-0 md:py-1.5 md:text-[9px]"
       >
         <svg
           className={cn(
@@ -705,7 +713,7 @@ function FavoritesSection({
         type="button"
         onClick={() => setSectionOpen((p) => !p)}
         onContextMenu={(e) => e.stopPropagation()}
-        className="flex w-full items-center gap-1.5 px-3 py-1.5 font-mono text-[9px] tracking-[2px] text-zinc-500 transition-colors hover:text-zinc-300"
+        className="flex min-h-[44px] w-full items-center gap-1.5 px-3 py-2.5 font-mono text-[12px] tracking-[2px] text-zinc-500 transition-colors hover:text-zinc-300 md:min-h-0 md:py-1.5 md:text-[9px]"
       >
         <svg
           className={cn("h-[6px] w-[6px] shrink-0 text-amber-400/70 transition-transform duration-150", sectionOpen && "rotate-90")}
@@ -1006,7 +1014,10 @@ export function FileSidebar({
         <button
           type="button"
           onClick={() => onAddMemo(selectedFolderId, "standard")}
-          className="flex w-full items-center gap-1.5 px-2 py-1 font-mono text-[10px] tracking-wide text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-cyan-400"
+          className={cn(
+            SIDEBAR_MOBILE_FOOTER_BTN,
+            "flex w-full items-center gap-1.5 px-3 font-mono tracking-wide text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-cyan-400",
+          )}
         >
           <span className="text-[12px] leading-none">+</span>
           <FileText size={11} className="shrink-0 opacity-70" />
@@ -1016,7 +1027,10 @@ export function FileSidebar({
         <button
           type="button"
           onClick={() => onAddMemo(selectedFolderId, "music")}
-          className="flex w-full items-center gap-1.5 px-2 py-1 font-mono text-[10px] tracking-wide text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-fuchsia-300/90"
+          className={cn(
+            SIDEBAR_MOBILE_FOOTER_BTN,
+            "flex w-full items-center gap-1.5 px-3 font-mono tracking-wide text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-fuchsia-300/90",
+          )}
         >
           <span className="text-[12px] leading-none">+</span>
           <Music2 size={11} className="shrink-0 opacity-80" />
@@ -1026,7 +1040,10 @@ export function FileSidebar({
         <button
           type="button"
           onClick={() => onAddMemo(selectedFolderId, "gamedev")}
-          className="flex w-full items-center gap-1.5 px-2 py-1 font-mono text-[10px] tracking-wide text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-cyan-300/90"
+          className={cn(
+            SIDEBAR_MOBILE_FOOTER_BTN,
+            "flex w-full items-center gap-1.5 px-3 font-mono tracking-wide text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-cyan-300/90",
+          )}
         >
           <span className="text-[12px] leading-none">+</span>
           <Gamepad2 size={11} className="shrink-0 opacity-80" />
@@ -1039,7 +1056,10 @@ export function FileSidebar({
             setNewFolderName("");
             requestAnimationFrame(() => newFolderInputRef.current?.focus());
           }}
-          className="flex w-full items-center gap-1.5 px-2 py-1 font-mono text-[10px] tracking-wide text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-300">
+          className={cn(
+            SIDEBAR_MOBILE_FOOTER_BTN,
+            "flex w-full items-center gap-1.5 px-3 font-mono tracking-wide text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-300",
+          )}>
           <span className="text-[12px] leading-none">+</span>
           <span>{t("sidebar.newFolder")}</span>
         </button>
@@ -1047,7 +1067,10 @@ export function FileSidebar({
           <button
             type="button"
             onClick={onExportFullBackup}
-            className="flex w-full items-center gap-2 px-2 py-1.5 font-mono text-[10px] tracking-wide text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-zinc-300"
+            className={cn(
+              SIDEBAR_MOBILE_FOOTER_BTN,
+              "flex w-full items-center gap-2 px-3 font-mono tracking-wide text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-zinc-300",
+            )}
             title={t("sidebar.exportTitle")}
           >
             <Download size={11} className="shrink-0 opacity-60" strokeWidth={2} />
@@ -1083,14 +1106,20 @@ export function FileSidebar({
           <button
             type="button"
             onClick={() => importBackupInputRef.current?.click()}
-            className="flex w-full items-center gap-2 px-2 py-1.5 font-mono text-[10px] tracking-wide text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-zinc-300"
+            className={cn(
+              SIDEBAR_MOBILE_FOOTER_BTN,
+              "flex w-full items-center gap-2 px-3 font-mono tracking-wide text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-zinc-300",
+            )}
             title={t("sidebar.importTitle")}
           >
             <Upload size={11} className="shrink-0 opacity-60" strokeWidth={2} />
             <span>{t("sidebar.importDataJson")}</span>
           </button>
           <button type="button" onClick={onOpenSettings}
-            className="flex w-full items-center gap-2 px-2 py-1.5 font-mono text-[10px] tracking-wide text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-zinc-300">
+            className={cn(
+              SIDEBAR_MOBILE_FOOTER_BTN,
+              "flex w-full items-center gap-2 px-3 font-mono tracking-wide text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-zinc-300",
+            )}>
             <Settings size={11} className="shrink-0" />
             <span>{t("sidebar.settings")}</span>
           </button>
@@ -1374,7 +1403,8 @@ function FileNode({
         onClick={rowInnerClick}
         className={cn(
           labelClass,
-          "group flex w-full min-w-0 items-center gap-1 py-[3px] pr-1 font-mono text-[11px] tracking-wide transition-colors active:cursor-grabbing",
+          "group flex w-full min-w-0 items-center gap-1 pr-1 transition-colors active:cursor-grabbing",
+          SIDEBAR_ROW_CLASS,
           item.type === "folder" && !isRenaming ? "cursor-pointer" : "cursor-grab",
           isDragging && "opacity-40",
         )}
@@ -1491,7 +1521,10 @@ function NewFolderRow({ depth, value, inputRef, onChange, onCommit, onCancel }: 
   const { t } = useTranslation();
   return (
     <div
-      className="flex items-center gap-1 py-[3px] pr-1"
+      className={cn(
+        "flex items-center gap-1 pr-1 md:py-[3px]",
+        "min-h-[44px] py-2.5 md:min-h-0",
+      )}
       style={{ paddingLeft: `${depth * 12 + 8}px` }}
       onContextMenu={(e) => e.stopPropagation()}
     >
