@@ -208,6 +208,8 @@ const messagesEn = {
   "mobile.editorBar.deleteNode": "Delete this node",
   "mobile.editorBar.deleteConfirm":
     "Delete this node from the outline? Nested children will be deleted as well.",
+  "mobile.formatToolbarToggle": "Text formatting",
+  "mobile.formatToolbarToggleHint": "Show or hide bold, size, color, and other formatting controls",
   "workflow.memoStatusTitle": "Memo status (DRAFT / WIP / DONE)",
   "workflow.memoStatusSection": "MEMO STATUS",
   "workflow.gamePipeline": "GAME PIPELINE",
@@ -451,6 +453,8 @@ const messagesJa: Record<MessageId, string> = {
   "mobile.editorBar.deleteNode": "このノードを削除",
   "mobile.editorBar.deleteConfirm":
     "このノードをアウトラインから削除しますか？子ノードもまとめて削除されます。",
+  "mobile.formatToolbarToggle": "テキスト装飾",
+  "mobile.formatToolbarToggleHint": "太字・サイズ・色などの装飾ツールを表示・非表示にします",
   "workflow.memoStatusTitle": "メモ全体のステータス（DRAFT / WIP / DONE）",
   "workflow.memoStatusSection": "メモのステータス",
   "workflow.gamePipeline": "ゲームパイプライン",

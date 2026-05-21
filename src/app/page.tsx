@@ -237,6 +237,7 @@ export default function Home() {
   const isMobileSelectionMode = useMobileUiStore((s) => s.isMobileSelectionMode);
   const toggleMobileSelectionMode = useMobileUiStore((s) => s.toggleMobileSelectionMode);
   const setMobileSelectionMode = useMobileUiStore((s) => s.setMobileSelectionMode);
+  const setMobileRichTextToolbarOpen = useMobileUiStore((s) => s.setMobileRichTextToolbarOpen);
   const effectiveSelectionMode = isSelectionMode || isMobileSelectionMode;
   const isResizingRef = useRef(false);
   const resizeStartXRef = useRef(0);
@@ -560,7 +561,8 @@ export default function Home() {
   useEffect(() => { setSelectedIds([]); selectionAnchorRef.current = null; }, [activeMemoId]);
   useEffect(() => {
     setMobileSelectionMode(false);
-  }, [activeMemoId, setMobileSelectionMode]);
+    setMobileRichTextToolbarOpen(false);
+  }, [activeMemoId, setMobileSelectionMode, setMobileRichTextToolbarOpen]);
 
   useEffect(() => {
     if (isMdUp) setMobileOutlineEditorBarNodeId(null);

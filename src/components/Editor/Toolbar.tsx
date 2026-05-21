@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type MouseEvent } from "react";
 import { ToolbarUnifiedMemoStatusControl } from "@/components/MemoWorkflowMenu";
 import { useShareModalStore } from "@/stores/shareModalStore";
-import { Share2 } from "lucide-react";
+import { Share2, Paintbrush } from "lucide-react";
 import { useTextFormatting, type FormatCommand } from "@/hooks/useTextFormatting";
 import {
   applyFontSizeWholeBodies,
@@ -13,6 +13,8 @@ import {
 } from "@/lib/editorBatchFormat";
 import { useTranslation } from "@/i18n/useTranslation";
 import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useMobileUiStore } from "@/stores/mobileUiStore";
 import type { GamedevStage } from "@/types/gamedev";
 import type { MemoType } from "@/types/memoKind";
 import type { MemoWorkflowStatus } from "@/types/memoWorkflow";
@@ -81,6 +83,16 @@ function Separator() {
   return <div className="mx-1 h-4 w-px bg-zinc-700" />;
 }
 
+/** Prevent top toolbar buttons from stealing focus from the outline editor on touch (keeps keyboard open). */
+const stopEditorFocusSteal = {
+  onPointerDown: (e: PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+  },
+  onMouseDown: (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+  },
+};
+
 export default function Toolbar({
   isEditorActive,
   getActiveEditor,
@@ -100,6 +112,9 @@ export default function Toolbar({
   readOnly = false,
 }: ToolbarProps) {
   const { t } = useTranslation();
+  const isMdUp = useMediaQuery("(min-width: 768px)");
+  const isMobileRichTextToolbarOpen = useMobileUiStore((s) => s.isMobileRichTextToolbarOpen);
+  const toggleMobileRichTextToolbar = useMobileUiStore((s) => s.toggleMobileRichTextToolbar);
   const openShareModal = useShareModalStore((s) => s.openShareModal);
   const colorPickerRef = useRef<HTMLInputElement>(null);
   const [fontSize, setFontSize] = useState(14);
@@ -257,37 +272,12 @@ export default function Toolbar({
     requestAnimationFrame(refreshFormatUi);
   };
 
-  return (
-    <div
-      data-geo-editor-toolbar
-      className="sticky top-0 z-50 flex min-w-0 shrink-0 flex-nowrap items-center gap-1 overflow-x-auto border-b border-zinc-800/60 bg-zinc-950/95 px-2 py-1.5 backdrop-blur-sm sm:px-3"
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      {/* Undo / Redo */}
-      <button
-        type="button"
-        title={t("toolbar.undo")}
-        disabled={readOnly || !canUndo}
-        onClick={onUndo}
-        className="flex h-6 w-6 items-center justify-center border border-zinc-700 text-xs text-zinc-200 disabled:opacity-30 hover:enabled:border-zinc-500 hover:enabled:text-zinc-50"
-      >
-        ↩
-      </button>
-      <button
-        type="button"
-        title={t("toolbar.redo")}
-        disabled={readOnly || !canRedo}
-        onClick={onRedo}
-        className="flex h-6 w-6 items-center justify-center border border-zinc-700 text-xs text-zinc-200 disabled:opacity-30 hover:enabled:border-zinc-500 hover:enabled:text-zinc-50"
-      >
-        ↪
-      </button>
-
-      <Separator />
-
+  const formatMain = (
+    <>
       <button
         type="button"
         disabled={!canEdit}
+        {...stopEditorFocusSteal}
         onClick={() => runCommand("bold")}
         className={formatBtnClass(formatUi.bold)}
       >
@@ -296,6 +286,7 @@ export default function Toolbar({
       <button
         type="button"
         disabled={!canEdit}
+        {...stopEditorFocusSteal}
         onClick={() => runCommand("italic")}
         className={formatBtnClass(formatUi.italic)}
       >
@@ -304,6 +295,7 @@ export default function Toolbar({
       <button
         type="button"
         disabled={!canEdit}
+        {...stopEditorFocusSteal}
         onClick={() => runCommand("underline")}
         className={formatBtnClass(formatUi.underline)}
       >
@@ -312,6 +304,7 @@ export default function Toolbar({
       <button
         type="button"
         disabled={!canEdit}
+        {...stopEditorFocusSteal}
         onClick={() => runCommand("strikeThrough")}
         className={formatBtnClass(formatUi.strikeThrough)}
       >
@@ -323,6 +316,7 @@ export default function Toolbar({
       <button
         type="button"
         disabled={!canEdit}
+        {...stopEditorFocusSteal}
         onClick={() => applyFontSize(fontSize - 1)}
         className="h-6 min-w-6 border border-zinc-700 px-1 text-xs text-zinc-200 disabled:opacity-40"
       >
@@ -344,6 +338,7 @@ export default function Toolbar({
       <button
         type="button"
         disabled={!canEdit}
+        {...stopEditorFocusSteal}
         onClick={() => applyFontSize(fontSize + 1)}
         className="h-6 min-w-6 border border-zinc-700 px-1 text-xs text-zinc-200 disabled:opacity-40"
       >
@@ -399,9 +394,9 @@ export default function Toolbar({
           key={swatch}
           type="button"
           disabled={!canEdit}
+          {...stopEditorFocusSteal}
           onClick={() => {
             if (color === swatch) {
-              // Same active color → open OS color picker for fine-tuning
               colorPickerRef.current?.click();
             } else {
               pickColor(swatch);
@@ -411,34 +406,98 @@ export default function Toolbar({
           style={{ background: swatch }}
         />
       ))}
+    </>
+  );
 
-      <Separator />
+  return (
+    <div
+      data-geo-editor-toolbar
+      className="sticky top-0 z-50 flex min-w-0 shrink-0 flex-col border-b border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm"
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto px-2 py-1.5 sm:px-3">
+        {!isMdUp && (
+          <button
+            type="button"
+            onClick={toggleMobileRichTextToolbar}
+            aria-pressed={isMobileRichTextToolbarOpen}
+            title={t("mobile.formatToolbarToggleHint")}
+            aria-label={t("mobile.formatToolbarToggle")}
+            {...stopEditorFocusSteal}
+            className={cn(
+              "flex h-6 w-6 shrink-0 items-center justify-center border transition-colors",
+              isMobileRichTextToolbarOpen
+                ? "border-cyan-500/55 bg-cyan-950/40 text-cyan-200"
+                : "border-zinc-700 text-zinc-200 hover:border-zinc-500 hover:text-zinc-50",
+            )}
+          >
+            <Paintbrush size={15} strokeWidth={2} className="shrink-0" />
+          </button>
+        )}
 
-      <div
-        className="ml-auto flex shrink-0 items-center gap-1.5"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-      >
+        {/* Undo / Redo */}
         <button
           type="button"
-          title={t("toolbar.share")}
-          aria-label={t("toolbar.share")}
-          disabled={readOnly}
-          onClick={() => openShareModal(activeMemoId)}
-          className="flex h-6 items-center gap-1 border border-zinc-700/90 bg-zinc-900/30 px-2 text-[10px] tracking-wide text-zinc-400 transition-colors hover:enabled:border-cyan-500/40 hover:enabled:bg-zinc-900/55 hover:enabled:text-cyan-200/90 disabled:opacity-40"
+          title={t("toolbar.undo")}
+          disabled={readOnly || !canUndo}
+          {...stopEditorFocusSteal}
+          onClick={onUndo}
+          className="flex h-6 w-6 items-center justify-center border border-zinc-700 text-xs text-zinc-200 disabled:opacity-30 hover:enabled:border-zinc-500 hover:enabled:text-zinc-50"
         >
-          <Share2 size={12} strokeWidth={1.75} className="shrink-0 opacity-85" />
-          <span className="max-[680px]:hidden">Share</span>
+          ↩
         </button>
-        <ToolbarUnifiedMemoStatusControl
-          memoType={memoType}
-          workflowStatus={workflowStatus}
-          onWorkflowChange={onWorkflowChange}
-          gamedevStage={gamedevStage}
-          onGamedevStageChange={onGamedevStageChange}
-          disabled={readOnly}
-        />
+        <button
+          type="button"
+          title={t("toolbar.redo")}
+          disabled={readOnly || !canRedo}
+          {...stopEditorFocusSteal}
+          onClick={onRedo}
+          className="flex h-6 w-6 items-center justify-center border border-zinc-700 text-xs text-zinc-200 disabled:opacity-30 hover:enabled:border-zinc-500 hover:enabled:text-zinc-50"
+        >
+          ↪
+        </button>
+
+        {isMdUp && (
+          <>
+            <Separator />
+            {formatMain}
+            <Separator />
+          </>
+        )}
+
+        <div
+          className="ml-auto flex shrink-0 items-center gap-1.5"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            title={t("toolbar.share")}
+            aria-label={t("toolbar.share")}
+            disabled={readOnly}
+            {...stopEditorFocusSteal}
+            onClick={() => openShareModal(activeMemoId)}
+            className="flex h-6 items-center gap-1 border border-zinc-700/90 bg-zinc-900/30 px-2 text-[10px] tracking-wide text-zinc-400 transition-colors hover:enabled:border-cyan-500/40 hover:enabled:bg-zinc-900/55 hover:enabled:text-cyan-200/90 disabled:opacity-40"
+          >
+            <Share2 size={12} strokeWidth={1.75} className="shrink-0 opacity-85" />
+            <span className="max-[680px]:hidden">Share</span>
+          </button>
+          <ToolbarUnifiedMemoStatusControl
+            memoType={memoType}
+            workflowStatus={workflowStatus}
+            onWorkflowChange={onWorkflowChange}
+            gamedevStage={gamedevStage}
+            onGamedevStageChange={onGamedevStageChange}
+            disabled={readOnly}
+          />
+        </div>
       </div>
+
+      {!isMdUp && isMobileRichTextToolbarOpen && (
+        <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto border-t border-zinc-800/50 px-2 py-1.5 sm:px-3">
+          {formatMain}
+        </div>
+      )}
     </div>
   );
 }

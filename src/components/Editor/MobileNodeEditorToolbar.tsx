@@ -71,11 +71,11 @@ export function MobileNodeEditorToolbar({
         paddingRight: "max(env(safe-area-inset-right, 0px), 8px)",
       }}
     >
-      <ToolbarIconButton ariaLabel={tip("mobile.editorBar.indent")} onPointerDown={(e) => e.preventDefault()} onClick={onIndent}>
-        <IndentIncrease size={20} strokeWidth={2} className="shrink-0" />
-      </ToolbarIconButton>
-      <ToolbarIconButton ariaLabel={tip("mobile.editorBar.outdent")} onPointerDown={(e) => e.preventDefault()} onClick={onOutdent}>
+      <ToolbarIconButton ariaLabel={tip("mobile.editorBar.outdent")} onClick={onOutdent}>
         <IndentDecrease size={20} strokeWidth={2} className="shrink-0" />
+      </ToolbarIconButton>
+      <ToolbarIconButton ariaLabel={tip("mobile.editorBar.indent")} onClick={onIndent}>
+        <IndentIncrease size={20} strokeWidth={2} className="shrink-0" />
       </ToolbarIconButton>
       <ToolbarIconButton
         ariaLabel={
@@ -84,7 +84,6 @@ export function MobileNodeEditorToolbar({
             : tip("mobile.editorBar.collapseChildren")
         }
         disabled={!hasChildren}
-        onPointerDown={(e) => e.preventDefault()}
         onClick={onToggleCollapsed}
       >
         {collapsed ? (
@@ -95,7 +94,6 @@ export function MobileNodeEditorToolbar({
       </ToolbarIconButton>
       <ToolbarIconButton
         ariaLabel={tip("mobile.editorBar.toggleCheckbox")}
-        onPointerDown={(e) => e.preventDefault()}
         onClick={onToggleCheckboxMode}
         className={hasCheckbox ? "text-cyan-300" : undefined}
       >
@@ -105,12 +103,11 @@ export function MobileNodeEditorToolbar({
           <Square size={20} strokeWidth={2} className="shrink-0" />
         )}
       </ToolbarIconButton>
-      <ToolbarIconButton ariaLabel={tip("mobile.editorBar.focusNode")} onPointerDown={(e) => e.preventDefault()} onClick={onFocusNode}>
+      <ToolbarIconButton ariaLabel={tip("mobile.editorBar.focusNode")} onClick={onFocusNode}>
         <Crosshair size={20} strokeWidth={2} className="shrink-0" />
       </ToolbarIconButton>
       <ToolbarIconButton
         ariaLabel={tip("mobile.editorBar.deleteNode")}
-        onPointerDown={(e) => e.preventDefault()}
         onClick={onDeleteNode}
         className="text-red-400/95 hover:bg-red-950/35 hover:text-red-300"
       >
@@ -123,14 +120,12 @@ export function MobileNodeEditorToolbar({
 function ToolbarIconButton({
   children,
   onClick,
-  onPointerDown,
   disabled,
   className,
   ariaLabel,
 }: {
   children: ReactNode;
   onClick: () => void;
-  onPointerDown?: (e: React.PointerEvent) => void;
   disabled?: boolean;
   className?: string;
   ariaLabel: string;
@@ -147,7 +142,13 @@ function ToolbarIconButton({
         !disabled && "active:bg-zinc-800 hover:bg-zinc-900 hover:text-white",
         className,
       )}
-      onPointerDown={onPointerDown}
+      /** Keeps focus on the contenteditable so the OS keyboard does not collapse between taps. */
+      onPointerDown={(e) => {
+        e.preventDefault();
+      }}
+      onMouseDown={(e) => {
+        e.preventDefault();
+      }}
       onClick={() => {
         if (disabled) return;
         onClick();
