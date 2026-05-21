@@ -115,6 +115,8 @@ export type NoteNodeProps = {
   onSetNodeImageUrl: (id: string, url: string | null) => void;
   /** Shared viewer: disable body / note editing (.images paste still allowed only if false). */
   editorReadOnly?: boolean;
+  /** Hide ⋮ popup / long-press context menu on compact screens (replaced by mobile editor bar). */
+  suppressFloatingContextMenu?: boolean;
 };
 
 const getCaretCharOffset = (el: HTMLElement): number => {
@@ -216,6 +218,7 @@ export default function NoteNode({
   onPatchNodeContents,
   onSetNodeImageUrl,
   editorReadOnly = false,
+  suppressFloatingContextMenu = false,
 }: NoteNodeProps) {
   const chrome = themeChromeAlphaMult;
   const hideThemedChrome = isThemeChromeInvisible(chrome);
@@ -432,12 +435,14 @@ export default function NoteNode({
   };
 
   const openMenu = () => {
+    if (suppressFloatingContextMenu) return;
     const rect = contentRowRef.current?.getBoundingClientRect();
     if (rect) setMenuAnchorRect(rect);
     setMenuOpen(true);
   };
 
   const openMenuAtPointer = (clientX: number, clientY: number) => {
+    if (suppressFloatingContextMenu) return;
     // Build a synthetic DOMRect anchored to the mouse pointer
     const fakeRect = {
       left: clientX - 20,
@@ -505,6 +510,7 @@ export default function NoteNode({
           <div
             className={cn(
               "absolute left-0 top-1/2 flex -translate-x-full -translate-y-1/2 items-center px-0.5 transition-opacity duration-150",
+              suppressFloatingContextMenu && "hidden md:flex",
               isHovered || menuOpen ? "opacity-100" : "pointer-events-none opacity-0",
             )}
           >
@@ -622,6 +628,10 @@ export default function NoteNode({
                 className="min-w-0 flex-1"
                 onFocusCapture={() => onActive(node.id, null)}
                 onContextMenu={(e) => {
+                  if (suppressFloatingContextMenu) {
+                    e.preventDefault();
+                    return;
+                  }
                   if (editorReadOnly) return;
                   e.preventDefault();
                   openMenuAtPointer(e.clientX, e.clientY);
@@ -661,6 +671,10 @@ export default function NoteNode({
                 className="min-w-0 flex-1"
                 onFocusCapture={() => onActive(node.id, null)}
                 onContextMenu={(e) => {
+                  if (suppressFloatingContextMenu) {
+                    e.preventDefault();
+                    return;
+                  }
                   if (editorReadOnly) return;
                   e.preventDefault();
                   openMenuAtPointer(e.clientX, e.clientY);
@@ -747,6 +761,10 @@ export default function NoteNode({
                 }
               }}
               onContextMenu={(e) => {
+                if (suppressFloatingContextMenu) {
+                  e.preventDefault();
+                  return;
+                }
                 if (editorReadOnly) return;
                 e.preventDefault();
                 openMenuAtPointer(e.clientX, e.clientY);
@@ -824,7 +842,7 @@ export default function NoteNode({
         </div>
         </div>
 
-        {menuOpen && menuAnchorRect && (
+        {menuOpen && !suppressFloatingContextMenu && menuAnchorRect && (
           <NodeContextMenu
             node={node}
             anchorRect={menuAnchorRect}
@@ -868,12 +886,14 @@ export default function NoteNode({
             ref={noteRef}
             contentEditable={!isSelectionMode && !editorReadOnly}
             suppressContentEditableWarning
+            data-geo-editor="node-note"
             aria-label="ノート"
             className={cn(
               "border-l bg-transparent pb-1 pl-2 pt-0.5 italic outline-none",
               hideThemedChrome && "border-l-0",
             )}
             style={noteEditorColorStyle(themeColor, chrome)}
+            onFocus={() => onActive(node.id, noteRef.current)}
             onCompositionStart={() => {
               noteComposingRef.current = true;
             }}
@@ -955,6 +975,7 @@ export default function NoteNode({
                   onMemoColorSliderUndoGestureEnd={onMemoColorSliderUndoGestureEnd}
                   onPatchNodeContents={onPatchNodeContents}
                   onSetNodeImageUrl={onSetNodeImageUrl}
+                  suppressFloatingContextMenu={suppressFloatingContextMenu}
                 />
               ))}
             </div>

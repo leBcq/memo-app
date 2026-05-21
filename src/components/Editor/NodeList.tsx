@@ -42,6 +42,8 @@ type NodeListProps = {
   onSetNodeImageUrl: (id: string, url: string | null) => void;
   /** Shared viewer: disable editing in all nodes. */
   editorReadOnly?: boolean;
+  /** Mobile: hide ⋮ / long-press menu; use bottom editor bar instead. */
+  suppressFloatingContextMenu?: boolean;
 };
 
 export default function NodeList({
@@ -79,6 +81,7 @@ export default function NodeList({
   onPatchNodeContents,
   onSetNodeImageUrl,
   editorReadOnly = false,
+  suppressFloatingContextMenu = false,
 }: NodeListProps) {
   return (
     <div className="space-y-2">
@@ -120,6 +123,7 @@ export default function NodeList({
           onPatchNodeContents={onPatchNodeContents}
           onSetNodeImageUrl={onSetNodeImageUrl}
           editorReadOnly={editorReadOnly}
+          suppressFloatingContextMenu={suppressFloatingContextMenu}
         />
       ))}
     </div>

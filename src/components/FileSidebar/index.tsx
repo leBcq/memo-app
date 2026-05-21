@@ -42,6 +42,9 @@ const SIDEBAR_ROW_CLASS =
 const SIDEBAR_MOBILE_FOOTER_BTN =
   "min-h-[44px] py-2.5 text-[13px] leading-snug md:min-h-0 md:py-1 md:text-[10px]";
 
+const SIDEBAR_FOOTER_MOBILE_ICON =
+  "flex min-h-10 min-w-0 flex-1 touch-manipulation items-center justify-center rounded-md bg-zinc-900/85 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100 active:bg-zinc-800/95";
+
 function parseDragPayload(raw: string): string[] {
   if (!raw) return [];
   try {
@@ -1010,7 +1013,37 @@ export function FileSidebar({
       </div>
 
       {/* Footer */}
-      <div className="space-y-1 border-t border-zinc-800/70 p-2">
+      <div className="border-t border-zinc-800/70 p-2 md:space-y-1 max-md:space-y-1.5 max-md:px-2 max-md:py-2">
+        <input
+          ref={importBackupInputRef}
+          type="file"
+          accept=".json,application/json"
+          className="sr-only"
+          aria-hidden
+          tabIndex={-1}
+          onChange={async (e) => {
+            const input = e.currentTarget;
+            const file = input.files?.[0];
+            input.value = "";
+            if (!file) return;
+            try {
+              await Promise.resolve(onImportFullBackup(file));
+            } catch (err) {
+              const msg =
+                err instanceof FreaviaBackupParseError
+                  ? err.code === "INVALID_JSON"
+                    ? t("sidebar.importErrorInvalidJson")
+                    : t("sidebar.importErrorInvalidBackup")
+                  : err instanceof Error
+                    ? err.message
+                    : t("sidebar.importErrorRead");
+              window.alert(msg);
+            }
+          }}
+        />
+
+        {/* md+: stacked */}
+        <div className="hidden md:block md:space-y-1">
         <button
           type="button"
           onClick={() => onAddMemo(selectedFolderId, "standard")}
@@ -1076,33 +1109,6 @@ export function FileSidebar({
             <Download size={11} className="shrink-0 opacity-60" strokeWidth={2} />
             <span>{t("sidebar.exportDataJson")}</span>
           </button>
-          <input
-            ref={importBackupInputRef}
-            type="file"
-            accept=".json,application/json"
-            className="sr-only"
-            aria-hidden
-            tabIndex={-1}
-            onChange={async (e) => {
-              const input = e.currentTarget;
-              const file = input.files?.[0];
-              input.value = "";
-              if (!file) return;
-              try {
-                await Promise.resolve(onImportFullBackup(file));
-              } catch (err) {
-                const msg =
-                  err instanceof FreaviaBackupParseError
-                    ? err.code === "INVALID_JSON"
-                      ? t("sidebar.importErrorInvalidJson")
-                      : t("sidebar.importErrorInvalidBackup")
-                    : err instanceof Error
-                      ? err.message
-                      : t("sidebar.importErrorRead");
-                window.alert(msg);
-              }
-            }}
-          />
           <button
             type="button"
             onClick={() => importBackupInputRef.current?.click()}
@@ -1115,20 +1121,104 @@ export function FileSidebar({
             <Upload size={11} className="shrink-0 opacity-60" strokeWidth={2} />
             <span>{t("sidebar.importDataJson")}</span>
           </button>
-          <button type="button" onClick={onOpenSettings}
+          <button
+            type="button"
+            onClick={onOpenSettings}
             className={cn(
               SIDEBAR_MOBILE_FOOTER_BTN,
               "flex w-full items-center gap-2 px-3 font-mono tracking-wide text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-zinc-300",
-            )}>
+            )}
+          >
             <Settings size={11} className="shrink-0" />
             <span>{t("sidebar.settings")}</span>
           </button>
-          <div className="pt-1">
-            <SidebarAuthBar />
+        </div>
+        </div>
+
+        {/* mobile: compact */}
+        <div className="md:hidden">
+          {selectedFolderId ? (
+            <div className="mb-1 truncate text-center font-mono text-[8px] tracking-wide text-zinc-600">
+              {t("sidebar.inFolder")}
+            </div>
+          ) : null}
+          <div className="flex flex-row gap-1">
+            <button
+              type="button"
+              className={cn(SIDEBAR_FOOTER_MOBILE_ICON, "text-cyan-400/95 hover:text-cyan-300")}
+              title={t("sidebar.standardMemo")}
+              aria-label={t("sidebar.standardMemo")}
+              onClick={() => onAddMemo(selectedFolderId, "standard")}
+            >
+              <FileText size={18} strokeWidth={2} className="shrink-0" />
+            </button>
+            <button
+              type="button"
+              className={cn(SIDEBAR_FOOTER_MOBILE_ICON, "text-fuchsia-300/95 hover:text-fuchsia-200")}
+              title={t("sidebar.musicMemo")}
+              aria-label={t("sidebar.musicMemo")}
+              onClick={() => onAddMemo(selectedFolderId, "music")}
+            >
+              <Music2 size={18} strokeWidth={2} className="shrink-0" />
+            </button>
+            <button
+              type="button"
+              className={SIDEBAR_FOOTER_MOBILE_ICON}
+              title={t("sidebar.gamedevMemo")}
+              aria-label={t("sidebar.gamedevMemo")}
+              onClick={() => onAddMemo(selectedFolderId, "gamedev")}
+            >
+              <Gamepad2 size={18} strokeWidth={2} className="shrink-0" />
+            </button>
+            <button
+              type="button"
+              className={SIDEBAR_FOOTER_MOBILE_ICON}
+              title={t("sidebar.newFolder")}
+              aria-label={t("sidebar.newFolder")}
+              onClick={() => {
+                setNewFolderParentId(selectedFolderId);
+                setNewFolderName("");
+                requestAnimationFrame(() => newFolderInputRef.current?.focus());
+              }}
+            >
+              <FolderPlus size={18} strokeWidth={2} className="shrink-0" />
+            </button>
+          </div>
+          <div className="mt-1.5 flex flex-row gap-1 border-t border-zinc-800/50 pt-1.5">
+            <button
+              type="button"
+              className={SIDEBAR_FOOTER_MOBILE_ICON}
+              title={t("sidebar.exportTitle")}
+              aria-label={t("sidebar.exportDataJson")}
+              onClick={onExportFullBackup}
+            >
+              <Download size={18} className="shrink-0 opacity-85" strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              className={SIDEBAR_FOOTER_MOBILE_ICON}
+              title={t("sidebar.importTitle")}
+              aria-label={t("sidebar.importDataJson")}
+              onClick={() => importBackupInputRef.current?.click()}
+            >
+              <Upload size={18} className="shrink-0 opacity-85" strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              className={SIDEBAR_FOOTER_MOBILE_ICON}
+              title={t("sidebar.settings")}
+              aria-label={t("sidebar.settings")}
+              onClick={onOpenSettings}
+            >
+              <Settings size={18} className="shrink-0 opacity-95" strokeWidth={2} />
+            </button>
           </div>
         </div>
-      </div>
 
+        <div className="pt-1">
+          <SidebarAuthBar />
+        </div>
+      </div>
       {/* Right-click context menu (item or empty space) */}
       {contextMenu?.kind === "item" ? (
         <SidebarContextMenu

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import CommandPalette, { type CommandPick } from "@/components/CommandPalette";
 import NodeList from "@/components/Editor/NodeList";
+import { MobileNodeEditorToolbar } from "@/components/Editor/MobileNodeEditorToolbar";
 import Toolbar from "@/components/Editor/Toolbar";
 import { FileSidebar } from "@/components/FileSidebar";
 import { SettingsModal } from "@/components/SettingsModal";
@@ -26,6 +27,7 @@ import {
 } from "@/lib/memoThemeColor";
 import { Menu, MousePointer2, X } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useVisualViewportBottomInsetPx } from "@/hooks/useVisualViewportBottomInsetPx";
 import { useMobileUiStore } from "@/stores/mobileUiStore";
 import type { MemoType } from "@/types/memoKind";
 import type { HeadingLevel, NoteNode } from "@/types/note";
@@ -104,7 +106,56 @@ const SIDEBAR_DEFAULT = 208; // ≈ w-52
 
 /** Memo/outline contenteditables use the app-wide undo stack; others (e.g. BPM) keep native text undo. */
 const GLOBAL_UNDO_CONTENTEDITABLE_SELECTOR =
-  '[data-geo-editor="body"],[data-geo-editor="focus-title"],[data-geo-editor="plugin-card"],[data-geo-editor="game-spec-card"]';
+  '[data-geo-editor="body"],[data-geo-editor="focus-title"],[data-geo-editor="plugin-card"],[data-geo-editor="game-spec-card"],[data-geo-editor="node-note"]';
+
+/** Contenteditable targets tracked for mobile keyboard-toolbar focus (md breakpoint excluded in UI). */
+const MOBILE_OUTLINE_FOCUS_EDITOR_SELECTOR =
+  '[data-geo-editor="body"],[data-geo-editor="focus-title"],[data-geo-editor="node-note"],[data-geo-editor="plugin-card"],[data-geo-editor="game-spec-card"]';
+
+function resolveMobileOutlineEditorNodeId(
+  focusedEl: HTMLElement | null,
+  focusedOutlineZoomNodeId: string | null,
+): string | null {
+  if (!focusedEl || !focusedEl.isConnected) return null;
+  if (focusedEl.closest('[data-mobile-editor-quickbar="true"]')) return null;
+  const match = focusedEl.closest(MOBILE_OUTLINE_FOCUS_EDITOR_SELECTOR);
+  if (!match) return null;
+  if (match.matches('[data-geo-editor="focus-title"]')) return focusedOutlineZoomNodeId;
+  const row = focusedEl.closest('[data-geo-block="note-node"][data-node-id]');
+  return row?.getAttribute("data-node-id") ?? null;
+}
+
+function refocusOutlineAfterMobileToolbar(opts: {
+  outlineNodeId: string;
+  focusZoomActiveId: string | null;
+}) {
+  const { outlineNodeId, focusZoomActiveId } = opts;
+  requestAnimationFrame(() => {
+    if (focusZoomActiveId === outlineNodeId) {
+      const hdr = document.querySelector<HTMLElement>('[data-geo-editor="focus-title"]');
+      if (hdr) {
+        hdr.focus();
+        return;
+      }
+    }
+    const pluginOrGameCard = document.querySelector(
+      `[data-node-id="${outlineNodeId}"] [data-geo-editor="plugin-card"], [data-node-id="${outlineNodeId}"] [data-geo-editor="game-spec-card"]`,
+    );
+    if (pluginOrGameCard) {
+      document
+        .querySelector<HTMLElement>(
+          `[data-node-id="${outlineNodeId}"] [data-card-focus-target="name"]`,
+        )
+        ?.focus();
+      return;
+    }
+    document
+      .querySelector<HTMLElement>(
+        `[data-node-id="${outlineNodeId}"] [data-geo-editor="body"], [data-node-id="${outlineNodeId}"] [data-geo-editor="node-note"]`,
+      )
+      ?.focus();
+  });
+}
 
 /** When true, let the browser handle Ctrl/Cmd+Z so field text undo is not swallowed. */
 function shouldDeferGlobalUndoToNative(): boolean {
@@ -147,6 +198,15 @@ export default function Home() {
 
   // ── Focus (zoom) mode ───────────────────────────────────────────────────────
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
+  const focusedNodeIdRef = useRef<string | null>(null);
+  focusedNodeIdRef.current = focusedNodeId;
+
+  /** Outline node targeted by md-only hidden context menu replacement (keyboard-adjacent bar). */
+  const [mobileOutlineEditorBarNodeId, setMobileOutlineEditorBarNodeId] = useState<string | null>(
+    null,
+  );
+
+  const visualViewportKeyboardInsetPx = useVisualViewportBottomInsetPx();
   const focusedHeaderRef = useRef<HTMLDivElement>(null);
   const { settings } = useSettings();
 
@@ -367,6 +427,23 @@ export default function Home() {
     return fromFile;
   }, [activeMemoFileItem?.color, activeMemo.themeColor]);
 
+  const mobileOutlineToolbarTargetNode = useMemo(
+    () =>
+      mobileOutlineEditorBarNodeId
+        ? findNodeById(nodes, mobileOutlineEditorBarNodeId)
+        : null,
+    [nodes, mobileOutlineEditorBarNodeId],
+  );
+
+  const mobileOutlineEditorToolbarVisible =
+    !isMdUp &&
+    !activeMemoReadOnly &&
+    !effectiveSelectionMode &&
+    mobileOutlineToolbarTargetNode !== null;
+
+  const mobileSelectionFabBottomPx =
+    visualViewportKeyboardInsetPx + (mobileOutlineEditorToolbarVisible ? 64 + 54 : 80);
+
   const handleFocusNode = useCallback((id: string) => {
     const target = findNodeById(nodes, id);
     if (target && target.children.length === 0) {
@@ -378,6 +455,63 @@ export default function Home() {
   const handleUnfocus = useCallback((toId: string | null = null) => {
     setFocusedNodeId(toId);
   }, []);
+
+  const runMobileOutlineToolbarIndent = useCallback(() => {
+    const id = mobileOutlineEditorBarNodeId;
+    if (!id || !findNodeById(nodes, id)) return;
+    handleIndent(id);
+    refocusOutlineAfterMobileToolbar({
+      outlineNodeId: id,
+      focusZoomActiveId: focusedNodeId,
+    });
+  }, [mobileOutlineEditorBarNodeId, nodes, handleIndent, focusedNodeId]);
+
+  const runMobileOutlineToolbarOutdent = useCallback(() => {
+    const id = mobileOutlineEditorBarNodeId;
+    if (!id || !findNodeById(nodes, id)) return;
+    handleUnindent(id);
+    refocusOutlineAfterMobileToolbar({
+      outlineNodeId: id,
+      focusZoomActiveId: focusedNodeId,
+    });
+  }, [mobileOutlineEditorBarNodeId, nodes, handleUnindent, focusedNodeId]);
+
+  const runMobileOutlineToolbarToggleCollapsed = useCallback(() => {
+    const id = mobileOutlineEditorBarNodeId;
+    if (!id || !findNodeById(nodes, id)) return;
+    toggleCollapsed(id);
+    refocusOutlineAfterMobileToolbar({
+      outlineNodeId: id,
+      focusZoomActiveId: focusedNodeId,
+    });
+  }, [mobileOutlineEditorBarNodeId, nodes, toggleCollapsed, focusedNodeId]);
+
+  const runMobileOutlineToolbarToggleCheckbox = useCallback(() => {
+    const id = mobileOutlineEditorBarNodeId;
+    if (!id || !findNodeById(nodes, id)) return;
+    toggleHasCheckbox(id);
+    refocusOutlineAfterMobileToolbar({
+      outlineNodeId: id,
+      focusZoomActiveId: focusedNodeId,
+    });
+  }, [mobileOutlineEditorBarNodeId, nodes, toggleHasCheckbox, focusedNodeId]);
+
+  const runMobileOutlineToolbarFocusZoom = useCallback(() => {
+    const id = mobileOutlineEditorBarNodeId;
+    if (!id || !findNodeById(nodes, id)) return;
+    handleFocusNode(id);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('[data-geo-editor="focus-title"]')?.focus();
+    });
+  }, [mobileOutlineEditorBarNodeId, nodes, handleFocusNode]);
+
+  const runMobileOutlineToolbarDelete = useCallback(() => {
+    const id = mobileOutlineEditorBarNodeId;
+    if (!id || !findNodeById(nodes, id)) return;
+    if (!window.confirm(t("mobile.editorBar.deleteConfirm"))) return;
+    setMobileOutlineEditorBarNodeId(null);
+    deleteNodeAndFocusPrev(id);
+  }, [mobileOutlineEditorBarNodeId, nodes, deleteNodeAndFocusPrev, t]);
 
   const handleCommandPick = useCallback(
     (pick: CommandPick) => {
@@ -419,11 +553,54 @@ export default function Home() {
   );
 
   // Reset focus when memo changes
-  useEffect(() => { setFocusedNodeId(null); }, [activeMemoId]);
+  useEffect(() => {
+    setFocusedNodeId(null);
+    setMobileOutlineEditorBarNodeId(null);
+  }, [activeMemoId]);
   useEffect(() => { setSelectedIds([]); selectionAnchorRef.current = null; }, [activeMemoId]);
   useEffect(() => {
     setMobileSelectionMode(false);
   }, [activeMemoId, setMobileSelectionMode]);
+
+  useEffect(() => {
+    if (isMdUp) setMobileOutlineEditorBarNodeId(null);
+  }, [isMdUp]);
+
+  /** Mobile outline: show keyboard-adjacent actions when caret is in outline contenteditables. */
+  useEffect(() => {
+    const root = memoWorkspaceRef.current;
+    if (!root || isMdUp) return;
+
+    const syncOutlineBarFromActiveElement = () => {
+      queueMicrotask(() => {
+        const ae = document.activeElement;
+        if (ae instanceof HTMLElement && root.contains(ae)) {
+          if (ae.closest('[data-mobile-editor-quickbar="true"]')) return;
+          const nid = resolveMobileOutlineEditorNodeId(ae, focusedNodeIdRef.current);
+          if (nid) {
+            setMobileOutlineEditorBarNodeId(nid);
+            return;
+          }
+        }
+        setMobileOutlineEditorBarNodeId(null);
+      });
+    };
+
+    const onOutlineFocusIn = (e: FocusEvent) => {
+      const t = e.target;
+      if (!(t instanceof HTMLElement)) return;
+      if (t.closest('[data-mobile-editor-quickbar="true"]')) return;
+      const nid = resolveMobileOutlineEditorNodeId(t, focusedNodeIdRef.current);
+      if (nid) setMobileOutlineEditorBarNodeId(nid);
+    };
+
+    root.addEventListener("focusout", syncOutlineBarFromActiveElement, true);
+    root.addEventListener("focusin", onOutlineFocusIn, true);
+    return () => {
+      root.removeEventListener("focusout", syncOutlineBarFromActiveElement, true);
+      root.removeEventListener("focusin", onOutlineFocusIn, true);
+    };
+  }, [isMdUp]);
 
   // Sync focused-node header contenteditable when the focused node changes
   useLayoutEffect(() => {
@@ -1009,7 +1186,15 @@ export default function Home() {
           </div>
 
           <div
-            className="min-h-0 flex-1 overflow-y-auto"
+            className={cn(
+              "min-h-0 flex-1 overflow-y-auto",
+              !isMdUp && mobileOutlineEditorToolbarVisible && "pb-[max(env(safe-area-inset-bottom),8px)]",
+            )}
+            style={
+              !isMdUp && mobileOutlineEditorToolbarVisible
+                ? { paddingBottom: `calc(5.75rem + ${visualViewportKeyboardInsetPx}px + env(safe-area-inset-bottom, 0px))` }
+                : undefined
+            }
             onMouseDown={(e) => {
               const t = e.target as HTMLElement;
               if (t.closest('[data-geo-block="note-node"]')) return;
@@ -1186,11 +1371,24 @@ export default function Home() {
                 onPatchGameData={patchNodeGameData}
                 onConvertToPluginCard={convertNodeToPluginCard}
                 onConvertToGameSpecCard={convertNodeToGameSpecCard}
+                suppressFloatingContextMenu={!isMdUp}
               />
             </div>
           </div>
+          <MobileNodeEditorToolbar
+            visible={mobileOutlineEditorToolbarVisible}
+            hasChildren={(mobileOutlineToolbarTargetNode?.children?.length ?? 0) > 0}
+            collapsed={Boolean(mobileOutlineToolbarTargetNode?.collapsed)}
+            hasCheckbox={Boolean(mobileOutlineToolbarTargetNode?.hasCheckbox)}
+            onIndent={runMobileOutlineToolbarIndent}
+            onOutdent={runMobileOutlineToolbarOutdent}
+            onToggleCollapsed={runMobileOutlineToolbarToggleCollapsed}
+            onToggleCheckboxMode={runMobileOutlineToolbarToggleCheckbox}
+            onFocusNode={runMobileOutlineToolbarFocusZoom}
+            onDeleteNode={runMobileOutlineToolbarDelete}
+          />
         </div>
-        </div>
+      </div>
       </div>
       <button
         type="button"
@@ -1198,8 +1396,9 @@ export default function Home() {
         title={t("mobile.selectionModeHint")}
         aria-pressed={isMobileSelectionMode}
         aria-label={t("mobile.selectionMode")}
+        style={{ bottom: mobileSelectionFabBottomPx }}
         className={cn(
-          "fixed bottom-20 right-4 z-[88] flex h-12 w-12 touch-manipulation items-center justify-center rounded-md border shadow-[0_8px_30px_rgba(0,0,0,0.4)] md:hidden",
+          "fixed right-4 z-[88] flex h-12 w-12 touch-manipulation items-center justify-center rounded-md border shadow-[0_8px_30px_rgba(0,0,0,0.4)] md:hidden",
           isMobileSelectionMode
             ? "border-cyan-400/55 bg-cyan-950/45 text-cyan-200 shadow-cyan-500/15"
             : "border-zinc-600/80 bg-zinc-900/95 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200",
