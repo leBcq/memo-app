@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ToolbarUnifiedMemoStatusControl } from "@/components/MemoWorkflowMenu";
 import { useShareModalStore } from "@/stores/shareModalStore";
 import { Share2, Paintbrush } from "lucide-react";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/editorBatchFormat";
 import { useTranslation } from "@/i18n/useTranslation";
 import { cn } from "@/lib/utils";
+import { attachChromeProofTap } from "@/lib/chromeProofPointerHandlers";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useMobileUiStore } from "@/stores/mobileUiStore";
 import type { GamedevStage } from "@/types/gamedev";
@@ -82,16 +83,6 @@ const clampSize = (size: number) => Math.min(72, Math.max(8, size));
 function Separator() {
   return <div className="mx-1 h-4 w-px bg-zinc-700" />;
 }
-
-/** Prevent top toolbar buttons from stealing focus from the outline editor on touch (keeps keyboard open). */
-const stopEditorFocusSteal = {
-  onPointerDown: (e: PointerEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-  },
-  onMouseDown: (e: MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-  },
-};
 
 export default function Toolbar({
   isEditorActive,
@@ -275,37 +266,41 @@ export default function Toolbar({
   const formatMain = (
     <>
       <button
-        type="button"
         disabled={!canEdit}
-        {...stopEditorFocusSteal}
-        onClick={() => runCommand("bold")}
+        {...attachChromeProofTap({
+          onActivate: () => runCommand("bold"),
+          disabled: !canEdit,
+        })}
         className={formatBtnClass(formatUi.bold)}
       >
         B
       </button>
       <button
-        type="button"
         disabled={!canEdit}
-        {...stopEditorFocusSteal}
-        onClick={() => runCommand("italic")}
+        {...attachChromeProofTap({
+          onActivate: () => runCommand("italic"),
+          disabled: !canEdit,
+        })}
         className={formatBtnClass(formatUi.italic)}
       >
         I
       </button>
       <button
-        type="button"
         disabled={!canEdit}
-        {...stopEditorFocusSteal}
-        onClick={() => runCommand("underline")}
+        {...attachChromeProofTap({
+          onActivate: () => runCommand("underline"),
+          disabled: !canEdit,
+        })}
         className={formatBtnClass(formatUi.underline)}
       >
         U
       </button>
       <button
-        type="button"
         disabled={!canEdit}
-        {...stopEditorFocusSteal}
-        onClick={() => runCommand("strikeThrough")}
+        {...attachChromeProofTap({
+          onActivate: () => runCommand("strikeThrough"),
+          disabled: !canEdit,
+        })}
         className={formatBtnClass(formatUi.strikeThrough)}
       >
         S
@@ -314,10 +309,11 @@ export default function Toolbar({
       <Separator />
 
       <button
-        type="button"
         disabled={!canEdit}
-        {...stopEditorFocusSteal}
-        onClick={() => applyFontSize(fontSize - 1)}
+        {...attachChromeProofTap({
+          onActivate: () => applyFontSize(fontSize - 1),
+          disabled: !canEdit,
+        })}
         className="h-6 min-w-6 border border-zinc-700 px-1 text-xs text-zinc-200 disabled:opacity-40"
       >
         -
@@ -336,10 +332,11 @@ export default function Toolbar({
         className="h-6 w-12 border border-zinc-700 bg-zinc-800 text-center text-xs text-zinc-200 outline-none"
       />
       <button
-        type="button"
         disabled={!canEdit}
-        {...stopEditorFocusSteal}
-        onClick={() => applyFontSize(fontSize + 1)}
+        {...attachChromeProofTap({
+          onActivate: () => applyFontSize(fontSize + 1),
+          disabled: !canEdit,
+        })}
         className="h-6 min-w-6 border border-zinc-700 px-1 text-xs text-zinc-200 disabled:opacity-40"
       >
         +
@@ -392,16 +389,17 @@ export default function Toolbar({
       {PRESET_COLORS.map((swatch) => (
         <button
           key={swatch}
-          type="button"
           disabled={!canEdit}
-          {...stopEditorFocusSteal}
-          onClick={() => {
-            if (color === swatch) {
-              colorPickerRef.current?.click();
-            } else {
-              pickColor(swatch);
-            }
-          }}
+          {...attachChromeProofTap({
+            disabled: !canEdit,
+            onActivate: () => {
+              if (color === swatch) {
+                colorPickerRef.current?.click();
+              } else {
+                pickColor(swatch);
+              }
+            },
+          })}
           className={`h-3.5 w-3.5 rounded-full border transition-all hover:scale-110 disabled:opacity-40 ${color === swatch ? "border-white/60 scale-110" : "border-white/10"}`}
           style={{ background: swatch }}
         />
@@ -418,12 +416,10 @@ export default function Toolbar({
       <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto px-2 py-1.5 sm:px-3">
         {!isMdUp && (
           <button
-            type="button"
-            onClick={toggleMobileRichTextToolbar}
             aria-pressed={isMobileRichTextToolbarOpen}
             title={t("mobile.formatToolbarToggleHint")}
             aria-label={t("mobile.formatToolbarToggle")}
-            {...stopEditorFocusSteal}
+            {...attachChromeProofTap({ onActivate: toggleMobileRichTextToolbar })}
             className={cn(
               "flex h-6 w-6 shrink-0 items-center justify-center border transition-colors",
               isMobileRichTextToolbarOpen
@@ -437,21 +433,23 @@ export default function Toolbar({
 
         {/* Undo / Redo */}
         <button
-          type="button"
           title={t("toolbar.undo")}
           disabled={readOnly || !canUndo}
-          {...stopEditorFocusSteal}
-          onClick={onUndo}
+          {...attachChromeProofTap({
+            onActivate: () => onUndo?.(),
+            disabled: readOnly || !canUndo,
+          })}
           className="flex h-6 w-6 items-center justify-center border border-zinc-700 text-xs text-zinc-200 disabled:opacity-30 hover:enabled:border-zinc-500 hover:enabled:text-zinc-50"
         >
           ↩
         </button>
         <button
-          type="button"
           title={t("toolbar.redo")}
           disabled={readOnly || !canRedo}
-          {...stopEditorFocusSteal}
-          onClick={onRedo}
+          {...attachChromeProofTap({
+            onActivate: () => onRedo?.(),
+            disabled: readOnly || !canRedo,
+          })}
           className="flex h-6 w-6 items-center justify-center border border-zinc-700 text-xs text-zinc-200 disabled:opacity-30 hover:enabled:border-zinc-500 hover:enabled:text-zinc-50"
         >
           ↪
@@ -471,12 +469,13 @@ export default function Toolbar({
           onClick={(e) => e.stopPropagation()}
         >
           <button
-            type="button"
             title={t("toolbar.share")}
             aria-label={t("toolbar.share")}
             disabled={readOnly}
-            {...stopEditorFocusSteal}
-            onClick={() => openShareModal(activeMemoId)}
+            {...attachChromeProofTap({
+              onActivate: () => openShareModal(activeMemoId),
+              disabled: readOnly,
+            })}
             className="flex h-6 items-center gap-1 border border-zinc-700/90 bg-zinc-900/30 px-2 text-[10px] tracking-wide text-zinc-400 transition-colors hover:enabled:border-cyan-500/40 hover:enabled:bg-zinc-900/55 hover:enabled:text-cyan-200/90 disabled:opacity-40"
           >
             <Share2 size={12} strokeWidth={1.75} className="shrink-0 opacity-85" />

@@ -44,6 +44,8 @@ type NodeListProps = {
   editorReadOnly?: boolean;
   /** Mobile: hide ⋮ / long-press menu; use bottom editor bar instead. */
   suppressFloatingContextMenu?: boolean;
+  /** Compact screens + selection mode: tap overlay toggles selection instead of editing. */
+  mobileTapToggleOverlay?: boolean;
 };
 
 export default function NodeList({
@@ -82,6 +84,7 @@ export default function NodeList({
   onSetNodeImageUrl,
   editorReadOnly = false,
   suppressFloatingContextMenu = false,
+  mobileTapToggleOverlay = false,
 }: NodeListProps) {
   return (
     <div className="space-y-2">
@@ -124,6 +127,7 @@ export default function NodeList({
           onSetNodeImageUrl={onSetNodeImageUrl}
           editorReadOnly={editorReadOnly}
           suppressFloatingContextMenu={suppressFloatingContextMenu}
+          mobileTapToggleOverlay={mobileTapToggleOverlay}
         />
       ))}
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { matchesKeybind } from "@/config/keybinds";
 import NodeContextMenu from "@/components/Editor/NodeContextMenu";
 import { PluginNodeCard } from "@/components/Editor/PluginNodeCard";
@@ -89,6 +89,8 @@ export type NoteNodeProps = {
   isSelectionMode?: boolean;
   onSelectStart?: (id: string, e: React.MouseEvent) => void;
   onMobileSelectNode?: (id: string) => void;
+  /** Mobile-only: full-row tap catcher while choosing nodes (does not affect Alt+desktop marquee). */
+  mobileTapToggleOverlay?: boolean;
   /** When `"music"`, shows per-line non-whitespace character count for lyrics. */
   memoType?: MemoType;
   onPatchPluginData?: (
@@ -219,6 +221,7 @@ export default function NoteNode({
   onSetNodeImageUrl,
   editorReadOnly = false,
   suppressFloatingContextMenu = false,
+  mobileTapToggleOverlay = false,
 }: NoteNodeProps) {
   const chrome = themeChromeAlphaMult;
   const hideThemedChrome = isThemeChromeInvisible(chrome);
@@ -479,24 +482,38 @@ export default function NoteNode({
         e.stopPropagation();
         onSelectStart?.(node.id, e);
       }}
-      onTouchStartCapture={(e) => {
-        if (!isSelectionMode) return;
-        const target = e.target as HTMLElement;
-        if (target.closest("button")) return;
-        // Capture runs on ancestors first; only handle touches whose innermost note-node is this row.
-        const innermost = target.closest('[data-geo-block="note-node"]');
-        if (innermost !== e.currentTarget) return;
-        e.preventDefault();
-        onMobileSelectNode?.(node.id);
-      }}
     >
       {/* Highlight only this node's row (+ note strip), not nested child nodes (avoids "whole subtree" box). */}
       <div
         className={cn(
-          "rounded-sm",
+          "relative rounded-sm",
           showBlockHighlight && "bg-cyan-500/20 ring-1 ring-inset ring-cyan-500/40",
         )}
       >
+        {mobileTapToggleOverlay && isSelectionMode && !!onMobileSelectNode && (
+          <div
+            className="absolute inset-0 z-[25] touch-none rounded-sm"
+            aria-hidden
+            onTouchStart={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onPointerDownCapture={(e: PointerEvent<HTMLDivElement>) => {
+              if (e.pointerType === "mouse" && e.button !== 0) return;
+              const stack = document.elementsFromPoint(e.clientX, e.clientY);
+              const hitsChromeButton = stack.some(
+                (el) =>
+                  el instanceof HTMLElement &&
+                  (el.closest("button") !== null || el.closest('[role="button"]') !== null),
+              );
+              if (hitsChromeButton) return;
+              e.preventDefault();
+              e.stopPropagation();
+              if (editorReadOnly) return;
+              onMobileSelectNode(node.id);
+            }}
+          />
+        )}
         <div ref={contentRowRef} className="relative w-full overflow-visible">
           <div
             className={cn(
@@ -625,7 +642,10 @@ export default function NoteNode({
 
             {isPluginCard && node.pluginData && onPatchPluginData ? (
               <div
-                className="min-w-0 flex-1"
+                className={cn(
+                  "min-w-0 flex-1",
+                  isSelectionMode && mobileTapToggleOverlay && "pointer-events-none touch-none",
+                )}
                 onFocusCapture={() => onActive(node.id, null)}
                 onContextMenu={(e) => {
                   if (suppressFloatingContextMenu) {
@@ -668,7 +688,10 @@ export default function NoteNode({
               </div>
             ) : isGameSpecCard && node.gameData && onPatchGameData ? (
               <div
-                className="min-w-0 flex-1"
+                className={cn(
+                  "min-w-0 flex-1",
+                  isSelectionMode && mobileTapToggleOverlay && "pointer-events-none touch-none",
+                )}
                 onFocusCapture={() => onActive(node.id, null)}
                 onContextMenu={(e) => {
                   if (suppressFloatingContextMenu) {
@@ -719,6 +742,7 @@ export default function NoteNode({
               className={cn(
                 "min-h-[22px] flex-1 whitespace-pre-wrap break-words bg-transparent leading-relaxed outline-none",
                 editorBodyClassNames(node),
+                isSelectionMode && mobileTapToggleOverlay && "pointer-events-none touch-none select-none",
               )}
               style={editorBodyColorStyle(node)}
               onFocus={() => onActive(node.id, editorRef.current)}
@@ -891,6 +915,7 @@ export default function NoteNode({
             className={cn(
               "border-l bg-transparent pb-1 pl-2 pt-0.5 italic outline-none",
               hideThemedChrome && "border-l-0",
+              isSelectionMode && mobileTapToggleOverlay && "pointer-events-none touch-none select-none",
             )}
             style={noteEditorColorStyle(themeColor, chrome)}
             onFocus={() => onActive(node.id, noteRef.current)}
@@ -976,6 +1001,7 @@ export default function NoteNode({
                   onPatchNodeContents={onPatchNodeContents}
                   onSetNodeImageUrl={onSetNodeImageUrl}
                   suppressFloatingContextMenu={suppressFloatingContextMenu}
+                  mobileTapToggleOverlay={mobileTapToggleOverlay}
                 />
               ))}
             </div>

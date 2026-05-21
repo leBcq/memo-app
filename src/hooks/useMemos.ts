@@ -1409,6 +1409,31 @@ export function useMemos() {
     [updateActiveNodes, focusNodeAfterCommit],
   );
 
+  /** Insert a sibling after `afterNodeId` with plain text converted to minimal HTML (lines → &lt;br&gt;). */
+  const insertSiblingWithPlainTextAfter = useCallback(
+    (afterNodeId: string, plainText: string) => {
+      const escapedLines = plainText.split(/\n/).map((line) =>
+        line
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;"),
+      );
+      const html = escapedLines.join("<br>");
+      const newNode = createNode({ content: html });
+      updateActiveNodes((nodes) => {
+        const insert = (list: NoteNode[]): NoteNode[] => {
+          const idx = list.findIndex((n) => n.id === afterNodeId);
+          if (idx !== -1) return [...list.slice(0, idx + 1), newNode, ...list.slice(idx + 1)];
+          return list.map((n) => ({ ...n, children: insert(n.children) }));
+        };
+        return insert(nodes);
+      }, "immediate");
+      focusNodeAfterCommit(newNode.id);
+    },
+    [updateActiveNodes, focusNodeAfterCommit],
+  );
+
   const addRootNode = useCallback(() => {
     const newNode = createNode();
     updateActiveNodes((nodes) => [newNode, ...nodes], "immediate");
@@ -1850,6 +1875,7 @@ export function useMemos() {
     toggleCollapsed,
     addChild,
     addSibling,
+    insertSiblingWithPlainTextAfter,
     addRootNode,
     removeNode,
     deleteNodeAndFocusPrev,

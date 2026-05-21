@@ -11,6 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { attachChromeProofTap } from "@/lib/chromeProofPointerHandlers";
 import type { MessageId } from "@/i18n/messages";
 import { useTranslation } from "@/i18n/useTranslation";
 import { useVisualViewportBottomInsetPx } from "@/hooks/useVisualViewportBottomInsetPx";
@@ -130,9 +131,13 @@ function ToolbarIconButton({
   className?: string;
   ariaLabel: string;
 }) {
+  const tap = attachChromeProofTap({
+    onActivate: () => onClick(),
+    disabled,
+  });
   return (
     <button
-      type="button"
+      {...tap}
       disabled={disabled}
       aria-label={ariaLabel}
       title={ariaLabel}
@@ -142,17 +147,6 @@ function ToolbarIconButton({
         !disabled && "active:bg-zinc-800 hover:bg-zinc-900 hover:text-white",
         className,
       )}
-      /** Keeps focus on the contenteditable so the OS keyboard does not collapse between taps. */
-      onPointerDown={(e) => {
-        e.preventDefault();
-      }}
-      onMouseDown={(e) => {
-        e.preventDefault();
-      }}
-      onClick={() => {
-        if (disabled) return;
-        onClick();
-      }}
     >
       {children}
     </button>
