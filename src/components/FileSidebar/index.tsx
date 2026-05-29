@@ -9,7 +9,7 @@ import { createPortal } from "react-dom";
 import {
   FolderPlus, Pencil, Trash2, Download, Upload,
   Star, StarOff, Copy, Archive, Settings, FileText,
-  Music2, Gamepad2, Music, Smile, Share2, Users, ChevronDown,
+  Music2, Gamepad2, Music, Smile, Share2, Users, ChevronDown, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/i18n/useTranslation";
@@ -1320,6 +1320,7 @@ export function FileSidebar({
           activeMemoId={activeMemoId}
           x={contextMenu.x}
           y={contextMenu.y}
+          mobileDrawerLayout={Boolean(mobileDrawerLayout)}
           onClose={() => setContextMenu(null)}
           onRename={() => { setRenamingId(contextMenu.item.id); setContextMenu(null); }}
           onDelete={() => openDeleteDialog(contextMenu.item)}
@@ -1821,6 +1822,7 @@ type SidebarMenuProps = {
   item: FileItem;
   activeMemoId: string;
   x: number; y: number;
+  mobileDrawerLayout?: boolean;
   onClose: () => void;
   onRename: () => void;
   onDelete: () => void;
@@ -1842,7 +1844,7 @@ type SidebarMenuProps = {
 
 
 function SidebarContextMenu(props: SidebarMenuProps) {
-  const { item, activeMemoId, x, y, onClose, onRename, onDelete,
+  const { item, activeMemoId, x, y, mobileDrawerLayout = false, onClose, onRename, onDelete,
     onAddMemoInside, onAddFolderInside,
     onDuplicate, onToggleFavorite, onChangeIcon, onExport, onArchive, onShare,
     onSetMemoType, onSetItemLabelColor,
@@ -1861,11 +1863,18 @@ function SidebarContextMenu(props: SidebarMenuProps) {
     !!onMemoColorSliderUndoGestureEnd;
 
   useEffect(() => {
-    const handler = (e: globalThis.MouseEvent) => {
+    const handler = (e: Event) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
-    const id = window.setTimeout(() => document.addEventListener("mousedown", handler), 0);
-    return () => { window.clearTimeout(id); document.removeEventListener("mousedown", handler); };
+    const id = window.setTimeout(() => {
+      document.addEventListener("mousedown", handler, true);
+      document.addEventListener("touchstart", handler, true);
+    }, 0);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener("mousedown", handler, true);
+      document.removeEventListener("touchstart", handler, true);
+    };
   }, [onClose]);
 
   const Row = ({
@@ -1890,6 +1899,7 @@ function SidebarContextMenu(props: SidebarMenuProps) {
   const Divider = () => <div className="mx-2 my-0.5 h-px bg-zinc-800/80" />;
 
   useLayoutEffect(() => {
+    if (mobileDrawerLayout) return;
     const el = ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -1906,12 +1916,37 @@ function SidebarContextMenu(props: SidebarMenuProps) {
     if (top < pad) top = pad;
     el.style.left = `${left}px`;
     el.style.top = `${top}px`;
-  }, [x, y]);
+  }, [x, y, mobileDrawerLayout]);
 
   const menu = (
-    <div ref={ref}
-      className="fixed z-[9999] w-[220px] border border-zinc-800 bg-zinc-950 py-0.5 font-mono shadow-xl shadow-black/60"
-      style={{ top: y, left: x }}>
+    <>
+      {mobileDrawerLayout && (
+        <button
+          type="button"
+          aria-label={t("sidebar.ctx.closeBackdrop")}
+          className="fixed inset-0 z-[9998] bg-black/55 backdrop-blur-[1px] md:hidden"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }}
+        />
+      )}
+      <div
+        ref={ref}
+        className={cn(
+          "fixed z-[9999] border border-zinc-800 bg-zinc-950 py-0.5 font-mono shadow-xl shadow-black/60",
+          mobileDrawerLayout
+            ? "bottom-0 left-0 right-0 max-h-[min(72vh,520px)] w-full overflow-y-auto rounded-t-xl border-zinc-700/80 pb-[max(env(safe-area-inset-bottom),8px)]"
+            : "w-[220px]",
+        )}
+        style={mobileDrawerLayout ? undefined : { top: y, left: x }}
+      >
       {item.type === "folder" ? (
         <>
           <Row icon={FileText} label={t("sidebar.ctx.newStandardMemo")} onClick={() => onAddMemoInside("standard")} />
@@ -2045,7 +2080,14 @@ function SidebarContextMenu(props: SidebarMenuProps) {
           <Row icon={Archive}   label={t("sidebar.ctx.archive")}        onClick={onArchive} muted />
         </>
       )}
+      {mobileDrawerLayout && (
+        <>
+          <Divider />
+          <Row icon={X} label={t("sidebar.ctx.close")} onClick={onClose} />
+        </>
+      )}
     </div>
+    </>
   );
 
   if (typeof document === "undefined") return null;

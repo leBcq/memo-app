@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ToolbarUnifiedMemoStatusControl } from "@/components/MemoWorkflowMenu";
 import { useShareModalStore } from "@/stores/shareModalStore";
-import { Share2, Paintbrush } from "lucide-react";
+import { Share2, Paintbrush, X } from "lucide-react";
 import { useTextFormatting, type FormatCommand } from "@/hooks/useTextFormatting";
 import {
   applyFontSizeWholeBodies,
@@ -16,9 +15,6 @@ import { cn } from "@/lib/utils";
 import { attachChromeProofTap } from "@/lib/chromeProofPointerHandlers";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useMobileUiStore } from "@/stores/mobileUiStore";
-import type { GamedevStage } from "@/types/gamedev";
-import type { MemoType } from "@/types/memoKind";
-import type { MemoWorkflowStatus } from "@/types/memoWorkflow";
 
 type FormatUiState = {
   bold: boolean;
@@ -65,11 +61,6 @@ type ToolbarProps = {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
-  memoType: MemoType;
-  workflowStatus: MemoWorkflowStatus;
-  onWorkflowChange: (status: MemoWorkflowStatus) => void;
-  gamedevStage?: GamedevStage;
-  onGamedevStageChange?: (stage: GamedevStage) => void;
   /** Active memo id (for Share and other memo-scoped actions). */
   activeMemoId: string;
   /** Shared viewer (or non-editor invitee): disable formatting and status controls. */
@@ -94,11 +85,6 @@ export default function Toolbar({
   canRedo = false,
   onUndo,
   onRedo,
-  memoType,
-  workflowStatus,
-  onWorkflowChange,
-  gamedevStage,
-  onGamedevStageChange,
   activeMemoId,
   readOnly = false,
 }: ToolbarProps) {
@@ -106,6 +92,15 @@ export default function Toolbar({
   const isMdUp = useMediaQuery("(min-width: 768px)");
   const isMobileRichTextToolbarOpen = useMobileUiStore((s) => s.isMobileRichTextToolbarOpen);
   const toggleMobileRichTextToolbar = useMobileUiStore((s) => s.toggleMobileRichTextToolbar);
+  const setMobileRichTextToolbarOpen = useMobileUiStore((s) => s.setMobileRichTextToolbarOpen);
+  const formatToolbarToggleTap = useMemo(
+    () => attachChromeProofTap({ onActivate: toggleMobileRichTextToolbar }),
+    [toggleMobileRichTextToolbar],
+  );
+  const formatToolbarCloseTap = useMemo(
+    () => attachChromeProofTap({ onActivate: () => setMobileRichTextToolbarOpen(false) }),
+    [setMobileRichTextToolbarOpen],
+  );
   const openShareModal = useShareModalStore((s) => s.openShareModal);
   const colorPickerRef = useRef<HTMLInputElement>(null);
   const [fontSize, setFontSize] = useState(14);
@@ -419,7 +414,7 @@ export default function Toolbar({
             aria-pressed={isMobileRichTextToolbarOpen}
             title={t("mobile.formatToolbarToggleHint")}
             aria-label={t("mobile.formatToolbarToggle")}
-            {...attachChromeProofTap({ onActivate: toggleMobileRichTextToolbar })}
+            {...formatToolbarToggleTap}
             className={cn(
               "flex h-6 w-6 shrink-0 items-center justify-center border transition-colors",
               isMobileRichTextToolbarOpen
@@ -481,20 +476,21 @@ export default function Toolbar({
             <Share2 size={12} strokeWidth={1.75} className="shrink-0 opacity-85" />
             <span className="max-[680px]:hidden">Share</span>
           </button>
-          <ToolbarUnifiedMemoStatusControl
-            memoType={memoType}
-            workflowStatus={workflowStatus}
-            onWorkflowChange={onWorkflowChange}
-            gamedevStage={gamedevStage}
-            onGamedevStageChange={onGamedevStageChange}
-            disabled={readOnly}
-          />
         </div>
       </div>
 
       {!isMdUp && isMobileRichTextToolbarOpen && (
         <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto border-t border-zinc-800/50 px-2 py-1.5 sm:px-3">
           {formatMain}
+          <button
+            type="button"
+            aria-label={t("mobile.formatToolbarClose")}
+            title={t("mobile.formatToolbarClose")}
+            {...formatToolbarCloseTap}
+            className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded border border-zinc-700/90 text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-100"
+          >
+            <X size={14} strokeWidth={2} aria-hidden />
+          </button>
         </div>
       )}
     </div>

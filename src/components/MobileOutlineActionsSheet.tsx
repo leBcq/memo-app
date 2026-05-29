@@ -89,7 +89,7 @@ export function MobileOutlineActionsSheet({
   const deleteDisabled = readOnly || selectedCount === 0;
 
   return (
-    <div className="fixed inset-0 z-[92] md:hidden" aria-modal role="dialog" aria-label={t("mobile.actionsMenu.dialogAria")}>
+    <div className="fixed inset-0 z-[92] md:hidden" data-mobile-outline-actions-sheet="true" aria-modal role="dialog" aria-label={t("mobile.actionsMenu.dialogAria")}>
       <button
         {...backdropTap}
         aria-label={t("mobile.actionsMenu.closeBackdrop")}
@@ -106,7 +106,6 @@ export function MobileOutlineActionsSheet({
             labelId={selectionLabel}
             onActivate={() => {
               onToggleSelectionMode();
-              onClose();
             }}
           />
           <SheetRow labelId="mobile.actionsMenu.copy" disabled={copyDisabled} onActivate={onCopy} />
@@ -123,6 +122,7 @@ export function MobileOutlineActionsSheet({
             disabled={deleteDisabled}
             onActivate={onDeleteSelection}
           />
+          <SheetRow labelId="mobile.actionsMenu.close" onActivate={onClose} />
         </div>
       </div>
     </div>

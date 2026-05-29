@@ -129,6 +129,8 @@ const messagesEn = {
   "sidebar.ctx.share": "Share…",
   "sidebar.archiveSoon": "Archive: coming soon",
   "sidebar.rowMenu.open": "Open item menu",
+  "sidebar.ctx.close": "Close",
+  "sidebar.ctx.closeBackdrop": "Close menu",
 
   "sidebar.delete.title": "Delete \"{name}\"?",
   "sidebar.delete.folderWarn":
@@ -211,9 +213,11 @@ const messagesEn = {
     "Delete this node from the outline? Nested children will be deleted as well.",
   "mobile.formatToolbarToggle": "Text formatting",
   "mobile.formatToolbarToggleHint": "Show or hide bold, size, color, and other formatting controls",
+  "mobile.formatToolbarClose": "Close formatting bar",
 
   "mobile.actionsMenu.dialogAria": "Outline actions",
   "mobile.actionsMenu.closeBackdrop": "Close menu",
+  "mobile.actionsMenu.close": "Close",
   "mobile.actionsMenu.selectionOn": "Selection mode · OFF → ON",
   "mobile.actionsMenu.selectionOff": "Selection mode · ON → OFF",
   "mobile.actionsMenu.copy": "Copy",
@@ -394,6 +398,8 @@ const messagesJa: Record<MessageId, string> = {
   "sidebar.ctx.share": "共有…",
   "sidebar.archiveSoon": "アーカイブは準備中です",
   "sidebar.rowMenu.open": "メニューを開く",
+  "sidebar.ctx.close": "閉じる",
+  "sidebar.ctx.closeBackdrop": "メニューを閉じる",
 
   "sidebar.delete.title": "「{name}」を削除しますか？",
   "sidebar.delete.folderWarn":
@@ -471,9 +477,11 @@ const messagesJa: Record<MessageId, string> = {
     "このノードをアウトラインから削除しますか？子ノードもまとめて削除されます。",
   "mobile.formatToolbarToggle": "テキスト装飾",
   "mobile.formatToolbarToggleHint": "太字・サイズ・色などの装飾ツールを表示・非表示にします",
+  "mobile.formatToolbarClose": "装飾バーを閉じる",
 
   "mobile.actionsMenu.dialogAria": "アウトラインの操作",
   "mobile.actionsMenu.closeBackdrop": "メニューを閉じる",
+  "mobile.actionsMenu.close": "閉じる",
   "mobile.actionsMenu.selectionOn": "選択モードをオンにする",
   "mobile.actionsMenu.selectionOff": "選択モードをオフにする",
   "mobile.actionsMenu.copy": "コピー",

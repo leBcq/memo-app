@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import CommandPalette, { type CommandPick } from "@/components/CommandPalette";
 import NodeList from "@/components/Editor/NodeList";
 import { MobileOutlineActionsSheet } from "@/components/MobileOutlineActionsSheet";
@@ -230,6 +231,7 @@ export default function Home() {
   // ── Multi-node block selection (explicit state; not browser text selection) ──
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [mobileOutlineSheetOpen, setMobileOutlineSheetOpen] = useState(false);
+  const [mobileFabPortalReady, setMobileFabPortalReady] = useState(false);
   const isDragSelectRef = useRef(false);
   /** Anchor for Shift+click range and drag-to-select */
   const selectionAnchorRef = useRef<string | null>(null);
@@ -380,8 +382,6 @@ export default function Home() {
     convertNodeToGameSpecCard,
     patchNodePluginData,
     patchNodeGameData,
-    setMemoWorkflowStatus,
-    patchActiveGamedevMeta,
     cloudSync,
     activeMemoReadOnly,
   } = useMemos();
@@ -436,7 +436,6 @@ export default function Home() {
     () => fileItems.find((i) => i.id === activeMemoId && i.type === "memo") ?? null,
     [fileItems, activeMemoId],
   );
-  const memoWorkflowStatus = activeMemoFileItem?.workflowStatus ?? "DRAFT";
 
   const memoThemeColor = useMemo(() => getMemoThemeColor(activeMemo), [activeMemo]);
 
@@ -574,6 +573,10 @@ export default function Home() {
     setFocusedNodeId(null);
     setMobileOutlineEditorBarNodeId(null);
   }, [activeMemoId]);
+  useEffect(() => {
+    setMobileFabPortalReady(true);
+  }, []);
+
   useEffect(() => { setSelectedIds([]); selectionAnchorRef.current = null; }, [activeMemoId]);
   useEffect(() => {
     setMobileOutlineSheetOpen(false);
@@ -875,9 +878,13 @@ export default function Home() {
     setMobileOutlineSheetOpen(false);
   }, [selectedIds, displayNodes, removeNode, t]);
 
-  const mobileOutlineFabTap = attachChromeProofTap({
-    onActivate: () => setMobileOutlineSheetOpen((open) => !open),
-  });
+  const mobileOutlineFabTap = useMemo(
+    () =>
+      attachChromeProofTap({
+        onActivate: () => setMobileOutlineSheetOpen((open) => !open),
+      }),
+    [],
+  );
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -942,6 +949,7 @@ export default function Home() {
         return;
       }
       if (!isDragSelectRef.current || !selectionAnchorRef.current) return;
+      if (!e.shiftKey) return;
       const els = document.elementsFromPoint(e.clientX, e.clientY);
       const nodeEl = els.find(
         (el) =>
@@ -1082,19 +1090,6 @@ export default function Home() {
         canRedo={canRedo}
         onUndo={undo}
         onRedo={redo}
-        memoType={activeMemo.memoType}
-        workflowStatus={memoWorkflowStatus}
-        onWorkflowChange={(s) => setMemoWorkflowStatus(activeMemoId, s)}
-        gamedevStage={
-          activeMemo.memoType === "gamedev" && activeMemo.gamedevMeta
-            ? activeMemo.gamedevMeta.stage
-            : undefined
-        }
-        onGamedevStageChange={
-          activeMemo.memoType === "gamedev"
-            ? (stage) => patchActiveGamedevMeta({ stage })
-            : undefined
-        }
         activeMemoId={activeMemoId}
         readOnly={activeMemoReadOnly}
       />
@@ -1497,21 +1492,27 @@ export default function Home() {
         onDeleteSelection={mobileActionsDeleteSelection}
       />
 
-      <button
-        {...mobileOutlineFabTap}
-        aria-expanded={mobileOutlineSheetOpen}
-        aria-haspopup="dialog"
-        aria-label={t("mobile.actionsMenu.openFabAria")}
-        title={t("mobile.actionsMenu.openFabAria")}
-        className={cn(
-          "fixed bottom-24 right-4 z-[93] flex h-12 w-12 touch-manipulation items-center justify-center rounded-md border shadow-[0_8px_30px_rgba(0,0,0,0.4)] md:hidden",
-          isMobileSelectionMode || mobileOutlineSheetOpen
-            ? "border-cyan-400/55 bg-cyan-950/45 text-cyan-200 shadow-cyan-500/15"
-            : "border-zinc-600/80 bg-zinc-900/95 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200",
+      {mobileFabPortalReady &&
+        !isMdUp &&
+        createPortal(
+          <button
+            {...mobileOutlineFabTap}
+            data-mobile-outline-fab="true"
+            aria-expanded={mobileOutlineSheetOpen}
+            aria-haspopup="dialog"
+            aria-label={t("mobile.actionsMenu.openFabAria")}
+            title={t("mobile.actionsMenu.openFabAria")}
+            className={cn(
+              "fixed bottom-24 right-4 z-[9999] flex h-12 w-12 touch-manipulation items-center justify-center rounded-md border shadow-[0_8px_30px_rgba(0,0,0,0.4)] md:hidden",
+              isMobileSelectionMode || mobileOutlineSheetOpen
+                ? "border-cyan-400/55 bg-cyan-950/45 text-cyan-200 shadow-cyan-500/15"
+                : "border-zinc-600/80 bg-zinc-900/95 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200",
+            )}
+          >
+            <MoreVertical size={22} strokeWidth={1.75} aria-hidden />
+          </button>,
+          document.body,
         )}
-      >
-        <MoreVertical size={22} strokeWidth={1.75} aria-hidden />
-      </button>
 
       <CloudSyncIndicator
         phase={cloudSync.phase}

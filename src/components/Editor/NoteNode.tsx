@@ -232,8 +232,8 @@ export default function NoteNode({
     [selectedIds, node.id],
   );
   const isSelected = selectedSet.has(node.id);
-  const showBlockHighlight = isSelected && !ancestorCoversSelection;
-  const childAncestorCovers = ancestorCoversSelection || isSelected;
+  const showBlockHighlight = isSelected;
+  const childAncestorCovers = false;
   // Pull live keybinds from settings context
   const { settings } = useSettings();
   const KEYBINDS = settings.keymap;
@@ -504,7 +504,10 @@ export default function NoteNode({
               const hitsChromeButton = stack.some(
                 (el) =>
                   el instanceof HTMLElement &&
-                  (el.closest("button") !== null || el.closest('[role="button"]') !== null),
+                  (el.closest("button") !== null ||
+                    el.closest('[role="button"]') !== null ||
+                    el.closest('[data-mobile-outline-fab="true"]') !== null ||
+                    el.closest('[data-mobile-outline-actions-sheet="true"]') !== null),
               );
               if (hitsChromeButton) return;
               e.preventDefault();
