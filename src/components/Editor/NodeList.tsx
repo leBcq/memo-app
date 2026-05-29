@@ -2,7 +2,7 @@
 
 import NoteNode from "@/components/Editor/NoteNode";
 import type { MemoType } from "@/types/memoKind";
-import type { NoteNode as NoteNodeType, NotePluginData, NoteGameData } from "@/types/note";
+import type { NoteNode as NoteNodeType, NotePluginData, NoteGameData, CustomCardProperty } from "@/types/note";
 
 type NodeListProps = {
   nodes: NoteNodeType[];
@@ -34,8 +34,12 @@ type NodeListProps = {
   onMobileSelectNode?: (id: string) => void;
   onPatchPluginData: (id: string, patch: Partial<NotePluginData>, historyMode?: "immediate" | "none") => void;
   onPatchGameData: (id: string, patch: Partial<NoteGameData>, historyMode?: "immediate" | "none") => void;
-  onConvertToPluginCard: (id: string) => void;
-  onConvertToGameSpecCard: (id: string) => void;
+  onAddCard: (id: string) => void;
+  onPatchCardTitle: (id: string, title: string) => void;
+  onAddCardProperty: (id: string) => void;
+  onRemoveCardProperty: (id: string, propId: string) => void;
+  onPatchCardProperty: (id: string, propId: string, patch: Partial<Omit<CustomCardProperty, "id">>, historyMode?: "immediate" | "none") => void;
+  onRemoveCard: (id: string) => void;
   onMemoColorSliderUndoGestureStart?: () => void;
   onMemoColorSliderUndoGestureEnd?: () => void;
   onPatchNodeContents: (patches: Record<string, string>) => void;
@@ -76,8 +80,12 @@ export default function NodeList({
   onMobileSelectNode,
   onPatchPluginData,
   onPatchGameData,
-  onConvertToPluginCard,
-  onConvertToGameSpecCard,
+  onAddCard,
+  onPatchCardTitle,
+  onAddCardProperty,
+  onRemoveCardProperty,
+  onPatchCardProperty,
+  onRemoveCard,
   onMemoColorSliderUndoGestureStart,
   onMemoColorSliderUndoGestureEnd,
   onPatchNodeContents,
@@ -117,10 +125,14 @@ export default function NodeList({
           memoType={memoType}
           onPatchPluginData={onPatchPluginData}
           onPatchGameData={onPatchGameData}
-          onConvertToPluginCard={onConvertToPluginCard}
+          onAddCard={onAddCard}
+          onPatchCardTitle={onPatchCardTitle}
+          onAddCardProperty={onAddCardProperty}
+          onRemoveCardProperty={onRemoveCardProperty}
+          onPatchCardProperty={onPatchCardProperty}
+          onRemoveCard={onRemoveCard}
           themeColor={themeColor}
           themeChromeAlphaMult={themeChromeAlphaMult}
-          onConvertToGameSpecCard={onConvertToGameSpecCard}
           onMemoColorSliderUndoGestureStart={onMemoColorSliderUndoGestureStart}
           onMemoColorSliderUndoGestureEnd={onMemoColorSliderUndoGestureEnd}
           onPatchNodeContents={onPatchNodeContents}

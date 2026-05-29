@@ -2,6 +2,52 @@ import { parseStoredColor, hexToRgba } from "@/lib/menuColorUtils";
 
 export type HeadingLevel = "h1" | "h2" | "h3" | null;
 
+// ─── Custom Card (generic key-value property card) ────────────────────────────
+
+export type CustomCardPropertyType = "text" | "textarea";
+
+export interface CustomCardProperty {
+  id: string;
+  label: string;
+  value: string;
+  type: CustomCardPropertyType;
+}
+
+export interface CustomCardData {
+  title: string;
+  properties: CustomCardProperty[];
+}
+
+export const DEFAULT_CUSTOM_CARD: CustomCardData = { title: "", properties: [] };
+
+export function normalizeCustomCardProperty(raw: unknown): CustomCardProperty {
+  if (!raw || typeof raw !== "object") {
+    return { id: String(Date.now()), label: "", value: "", type: "text" };
+  }
+  const o = raw as Record<string, unknown>;
+  const type: CustomCardPropertyType =
+    o.type === "textarea" ? "textarea" : "text";
+  return {
+    id: typeof o.id === "string" ? o.id : String(Date.now()),
+    label: typeof o.label === "string" ? o.label : "",
+    value: typeof o.value === "string" ? o.value : "",
+    type,
+  };
+}
+
+export function normalizeCustomCardData(raw: unknown): CustomCardData {
+  if (!raw || typeof raw !== "object") return { ...DEFAULT_CUSTOM_CARD };
+  const o = raw as Record<string, unknown>;
+  return {
+    title: typeof o.title === "string" ? o.title : "",
+    properties: Array.isArray(o.properties)
+      ? o.properties.map(normalizeCustomCardProperty)
+      : [],
+  };
+}
+
+// ─── Legacy card types (kept for backward compatibility) ──────────────────────
+
 /** DAW plugin / instrument metadata (music memo plugin cards). */
 export interface NotePluginData {
   name: string;
@@ -71,6 +117,8 @@ export interface NoteNode {
   pluginData?: NotePluginData;
   /** Gamedev memo: spec sheet card (mutually exclusive with pluginData in normalized form). */
   gameData?: NoteGameData;
+  /** Generic custom property card — supersedes pluginData / gameData when present. */
+  cardData?: CustomCardData;
 }
 
 const createId = () => {
@@ -93,10 +141,13 @@ export function normalizeGameData(raw: unknown): NoteGameData {
 }
 
 export function createNode(partial?: Partial<NoteNode>): NoteNode {
-  const { pluginData: pIn, gameData: gIn, id: idPartial, ...rest } = partial ?? {};
+  const { pluginData: pIn, gameData: gIn, cardData: cIn, id: idPartial, ...rest } = partial ?? {};
   let pluginData = pIn !== undefined ? normalizePluginData(pIn) : undefined;
   let gameData = gIn !== undefined ? normalizeGameData(gIn) : undefined;
-  if (gameData) pluginData = undefined;
+  let cardData = cIn !== undefined ? normalizeCustomCardData(cIn) : undefined;
+  // cardData takes priority; within legacy types they are mutually exclusive
+  if (cardData) { pluginData = undefined; gameData = undefined; }
+  else if (gameData) pluginData = undefined;
   else if (pluginData) gameData = undefined;
 
   const id =
@@ -116,6 +167,7 @@ export function createNode(partial?: Partial<NoteNode>): NoteNode {
     ...rest,
     pluginData,
     gameData,
+    cardData,
   };
 }
 
@@ -178,6 +230,7 @@ export function cloneNoteTreeForPersistence(nodes: NoteNode[]): NoteNode[] {
     imageUrl: n.imageUrl && n.imageUrl.trim() ? n.imageUrl.trim() : null,
     ...(n.pluginData !== undefined ? { pluginData: n.pluginData } : {}),
     ...(n.gameData !== undefined ? { gameData: n.gameData } : {}),
+    ...(n.cardData !== undefined ? { cardData: n.cardData } : {}),
   }));
 }
 
@@ -188,14 +241,24 @@ export function normalizeNode(raw: Partial<NoteNode> & { children?: unknown }): 
       )
     : [];
 
+  const cardRaw = (raw as Partial<NoteNode>).cardData;
+  const cardData =
+    cardRaw !== undefined && cardRaw !== null ? normalizeCustomCardData(cardRaw) : undefined;
+
   const pluginRaw = (raw as Partial<NoteNode>).pluginData;
   let pluginData =
-    pluginRaw !== undefined && pluginRaw !== null ? normalizePluginData(pluginRaw) : undefined;
+    !cardData && pluginRaw !== undefined && pluginRaw !== null
+      ? normalizePluginData(pluginRaw)
+      : undefined;
   const gameRaw = (raw as Partial<NoteNode>).gameData;
   let gameData =
-    gameRaw !== undefined && gameRaw !== null ? normalizeGameData(gameRaw) : undefined;
-  if (gameData) pluginData = undefined;
-  else if (pluginData) gameData = undefined;
+    !cardData && gameRaw !== undefined && gameRaw !== null
+      ? normalizeGameData(gameRaw)
+      : undefined;
+  if (!cardData) {
+    if (gameData) pluginData = undefined;
+    else if (pluginData) gameData = undefined;
+  }
 
   return createNode({
     id: raw.id,
@@ -211,5 +274,6 @@ export function normalizeNode(raw: Partial<NoteNode> & { children?: unknown }): 
       typeof raw.imageUrl === "string" && raw.imageUrl.trim() ? raw.imageUrl.trim() : null,
     pluginData,
     gameData,
+    cardData,
   });
 }

@@ -10,7 +10,7 @@ import {
   insertSiblingNodesAfter,
   flattenPreorderIds,
 } from "@/lib/treeUtils";
-import type { HeadingLevel, NoteNode, NotePluginData, NoteGameData } from "@/types/note";
+import type { HeadingLevel, NoteNode, NotePluginData, NoteGameData, CustomCardData, CustomCardProperty } from "@/types/note";
 import {
   createNode,
   normalizeNode,
@@ -929,15 +929,6 @@ export function useMemos() {
     [recordBeforeMutation],
   );
 
-  const initMusicModuleForMemo = useCallback((memoId: string) => {
-    setMemos((prev) =>
-      prev.map((m) => {
-        if (m.id !== memoId || m.musicMeta !== null) return m;
-        return { ...m, musicMeta: { ...DEFAULT_MUSIC_META } };
-      }),
-    );
-  }, []);
-
   const patchActiveGamedevMeta = useCallback(
     (patch: Partial<MemoGamedevMeta>) => {
       recordBeforeMutation();
@@ -1742,6 +1733,127 @@ export function useMemos() {
     [updateActiveNodes, focusNode],
   );
 
+  // ── Custom card CRUD ─────────────────────────────────────────────────────────
+
+  const addCardToNode = useCallback(
+    (nodeId: string) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId) return n;
+            return {
+              ...n,
+              content: "",
+              pluginData: undefined,
+              gameData: undefined,
+              cardData: { title: "", properties: [] } satisfies CustomCardData,
+            };
+          }),
+        "immediate",
+      );
+      requestAnimationFrame(() => focusNode(nodeId));
+    },
+    [updateActiveNodes, focusNode],
+  );
+
+  const patchCardTitle = useCallback(
+    (nodeId: string, title: string) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.cardData) return n;
+            return { ...n, cardData: { ...n.cardData, title } };
+          }),
+        "none",
+      );
+    },
+    [updateActiveNodes],
+  );
+
+  const addCardProperty = useCallback(
+    (nodeId: string) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.cardData) return n;
+            const newProp: CustomCardProperty = {
+              id: makeId(),
+              label: "",
+              value: "",
+              type: "text",
+            };
+            return {
+              ...n,
+              cardData: { ...n.cardData, properties: [...n.cardData.properties, newProp] },
+            };
+          }),
+        "immediate",
+      );
+    },
+    [updateActiveNodes],
+  );
+
+  const removeCardProperty = useCallback(
+    (nodeId: string, propId: string) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.cardData) return n;
+            return {
+              ...n,
+              cardData: {
+                ...n.cardData,
+                properties: n.cardData.properties.filter((p) => p.id !== propId),
+              },
+            };
+          }),
+        "immediate",
+      );
+    },
+    [updateActiveNodes],
+  );
+
+  const patchCardProperty = useCallback(
+    (
+      nodeId: string,
+      propId: string,
+      patch: Partial<Omit<CustomCardProperty, "id">>,
+      historyMode: "immediate" | "none" = "none",
+    ) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.cardData) return n;
+            return {
+              ...n,
+              cardData: {
+                ...n.cardData,
+                properties: n.cardData.properties.map((p) =>
+                  p.id === propId ? { ...p, ...patch } : p,
+                ),
+              },
+            };
+          }),
+        historyMode,
+      );
+    },
+    [updateActiveNodes],
+  );
+
+  const removeCard = useCallback(
+    (nodeId: string) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.cardData) return n;
+            return { ...n, cardData: undefined };
+          }),
+        "immediate",
+      );
+    },
+    [updateActiveNodes],
+  );
+
   const patchNodePluginData = useCallback(
     (nodeId: string, patch: Partial<NotePluginData>, historyMode: "immediate" | "none" = "none") => {
       updateActiveNodes(
@@ -1852,7 +1964,6 @@ export function useMemos() {
     switchMemo,
     addMemo,
     setMemoType,
-    initMusicModuleForMemo,
     patchActiveMusicMeta,
     patchActiveGamedevMeta,
     updateMemoTitle,
@@ -1914,6 +2025,12 @@ export function useMemos() {
     addGameSpecSibling,
     patchNodePluginData,
     patchNodeGameData,
+    addCardToNode,
+    patchCardTitle,
+    addCardProperty,
+    removeCardProperty,
+    patchCardProperty,
+    removeCard,
     setMemoWorkflowStatus,
     cloudSync: {
       phase: cloudPhase,

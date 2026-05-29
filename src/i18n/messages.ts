@@ -294,6 +294,7 @@ const messagesEn = {
   "ctx.toggleNote": "Note",
   "ctx.turnPlugin": "Turn into Plugin Card",
   "ctx.turnSpec": "Turn into Spec Card",
+  "ctx.addCard": "🧩 Add Card",
 
   "ctx.focusThisNode": "Focus on this node",
   "ctx.indent": "Indent",
@@ -304,6 +305,17 @@ const messagesEn = {
   "ctx.complete": "Mark complete",
   "ctx.uncomplete": "Clear complete",
   "ctx.addNoteToggle": "Note",
+
+  // Custom card UI
+  "card.titlePh": "Card title…",
+  "card.propLabelPh": "Label",
+  "card.propValuePh": "Value",
+  "card.addProperty": "Add property",
+  "card.removeCard": "Remove card",
+  "card.removeCardConfirm": "Remove this card?",
+  "card.removeProperty": "Remove property",
+  "card.typeToggleSingle": "→ Single line",
+  "card.typeToggleMulti": "→ Multi-line",
 } as const;
 
 const messagesJa: Record<MessageId, string> = {
@@ -589,6 +601,7 @@ const messagesJa: Record<MessageId, string> = {
   "ctx.toggleNote": "ノート",
   "ctx.turnPlugin": "プラグインカードに変換",
   "ctx.turnSpec": "仕様カードに変換",
+  "ctx.addCard": "🧩 カードを追加",
 
   "ctx.focusThisNode": "このノードにフォーカス",
   "ctx.indent": "インデント",
@@ -599,6 +612,17 @@ const messagesJa: Record<MessageId, string> = {
   "ctx.complete": "完了にする",
   "ctx.uncomplete": "完了を解除",
   "ctx.addNoteToggle": "ノートを追加",
+
+  // Custom card UI
+  "card.titlePh": "カードのタイトル…",
+  "card.propLabelPh": "項目名",
+  "card.propValuePh": "値",
+  "card.addProperty": "＋ 項目を追加",
+  "card.removeCard": "カードを削除",
+  "card.removeCardConfirm": "このカードを削除しますか？",
+  "card.removeProperty": "項目を削除",
+  "card.typeToggleSingle": "→ 1行",
+  "card.typeToggleMulti": "→ 複数行",
 };
 
 export const messages = {

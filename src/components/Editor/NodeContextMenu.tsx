@@ -40,8 +40,8 @@ type Props = {
   onDelete: () => void;
   onFocusNode: () => void;
   memoType?: MemoType;
-  onTurnIntoPlugin?: () => void;
-  onTurnIntoGameSpec?: () => void;
+  /** Replace current node body with a new generic custom card. */
+  onAddCard?: () => void;
   onMemoColorSliderUndoGestureStart?: () => void;
   onMemoColorSliderUndoGestureEnd?: () => void;
   /** When length ≥ 2, TEXT/inline tools apply to all these bodies in one commit. */
@@ -68,8 +68,7 @@ export function NodeContextMenu({
   onAddChild, onAddSibling, onToggleNote,
   onSetBgColor, onSetHeading, onDelete, onFocusNode,
   memoType = "standard",
-  onTurnIntoPlugin,
-  onTurnIntoGameSpec,
+  onAddCard,
   onMemoColorSliderUndoGestureStart,
   onMemoColorSliderUndoGestureEnd,
   textBatchTargetIds,
@@ -304,26 +303,15 @@ export function NodeContextMenu({
           <span className="flex-1 text-[11px] tracking-wide text-zinc-200">{t("ctx.addNoteToggle")}</span>
           <ToggleSwitch on={node.note !== null} />
         </div>
-        {memoType === "music" && onTurnIntoPlugin && (
+        {onAddCard && (
           <MenuItem
-            icon="◇"
+            icon="🧩"
             onClick={() => {
-              onTurnIntoPlugin();
+              onAddCard();
               onClose();
             }}
           >
-            {t("ctx.turnPlugin")}
-          </MenuItem>
-        )}
-        {memoType === "gamedev" && onTurnIntoGameSpec && (
-          <MenuItem
-            icon="◆"
-            onClick={() => {
-              onTurnIntoGameSpec();
-              onClose();
-            }}
-          >
-            {t("ctx.turnSpec")}
+            {t("ctx.addCard")}
           </MenuItem>
         )}
       </AccordionSection>

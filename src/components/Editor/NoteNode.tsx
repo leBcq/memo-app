@@ -5,6 +5,7 @@ import { matchesKeybind } from "@/config/keybinds";
 import NodeContextMenu from "@/components/Editor/NodeContextMenu";
 import { PluginNodeCard } from "@/components/Editor/PluginNodeCard";
 import { GameSpecNodeCard } from "@/components/Editor/GameSpecNodeCard";
+import { CustomNodeCard } from "@/components/Editor/CustomNodeCard";
 import {
   musicLyricNonWhitespaceCountFromElement,
   musicLyricNonWhitespaceCountFromHtml,
@@ -22,7 +23,7 @@ import {
   isThemeChromeInvisible,
 } from "@/lib/memoThemeColor";
 import type { MemoType } from "@/types/memoKind";
-import type { NoteNode as NoteNodeType, NotePluginData, NoteGameData } from "@/types/note";
+import type { NoteNode as NoteNodeType, NotePluginData, NoteGameData, CustomCardProperty } from "@/types/note";
 import { useSettings } from "@/contexts/SettingsContext";
 import { isSelectionModifierHeld } from "@/lib/selectionModeModifier";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
@@ -104,12 +105,22 @@ export type NoteNodeProps = {
     patch: Partial<NoteGameData>,
     historyMode?: "immediate" | "none",
   ) => void;
-  onConvertToPluginCard?: (id: string) => void;
+  /** Attach a new generic custom card to this node. */
+  onAddCard?: (id: string) => void;
+  onPatchCardTitle?: (id: string, title: string) => void;
+  onAddCardProperty?: (id: string) => void;
+  onRemoveCardProperty?: (id: string, propId: string) => void;
+  onPatchCardProperty?: (
+    id: string,
+    propId: string,
+    patch: Partial<Omit<CustomCardProperty, "id">>,
+    historyMode?: "immediate" | "none",
+  ) => void;
+  onRemoveCard?: (id: string) => void;
   /** Memo theme accent for bullets, cards, mode-adjacent chrome (not body text). */
   themeColor: string;
   /** 0–1 from sidebar tint alpha; fades borders/glows while keeping hue for text. */
   themeChromeAlphaMult?: number;
-  onConvertToGameSpecCard?: (id: string) => void;
   onMemoColorSliderUndoGestureStart?: () => void;
   onMemoColorSliderUndoGestureEnd?: () => void;
   /** Batch sync note bodies after multi-target TEXT formatting in context menu. */
@@ -212,10 +223,14 @@ export default function NoteNode({
   memoType = "standard",
   onPatchPluginData,
   onPatchGameData,
-  onConvertToPluginCard,
+  onAddCard,
+  onPatchCardTitle,
+  onAddCardProperty,
+  onRemoveCardProperty,
+  onPatchCardProperty,
+  onRemoveCard,
   themeColor,
   themeChromeAlphaMult = 1,
-  onConvertToGameSpecCard,
   onMemoColorSliderUndoGestureStart,
   onMemoColorSliderUndoGestureEnd,
   onPatchNodeContents,
@@ -254,8 +269,9 @@ export default function NoteNode({
   const [musicLyricLiveCount, setMusicLyricLiveCount] = useState<number | null>(null);
 
   const hasChildren = node.children.length > 0;
-  const isPluginCard = Boolean(node.pluginData);
-  const isGameSpecCard = Boolean(node.gameData);
+  const isCustomCard = Boolean(node.cardData);
+  const isPluginCard = !isCustomCard && Boolean(node.pluginData);
+  const isGameSpecCard = !isCustomCard && !isPluginCard && Boolean(node.gameData);
   const showMusicLyricCount = memoType === "music" && !isPluginCard && !isGameSpecCard;
   const musicLyricCommittedCount = useMemo(
     () => (showMusicLyricCount ? musicLyricNonWhitespaceCountFromHtml(node.content) : 0),
@@ -644,7 +660,35 @@ export default function NoteNode({
               </button>
             )}
 
-            {isPluginCard && node.pluginData && onPatchPluginData ? (
+            {isCustomCard && node.cardData && onPatchCardTitle ? (
+              <div
+                className={cn(
+                  "min-w-0 flex-1",
+                  isSelectionMode && mobileTapToggleOverlay && "pointer-events-none touch-none",
+                )}
+                onFocusCapture={() => onActive(node.id, null)}
+                onContextMenu={(e) => {
+                  if (suppressFloatingContextMenu) { e.preventDefault(); return; }
+                  if (editorReadOnly) return;
+                  e.preventDefault();
+                  openMenuAtPointer(e.clientX, e.clientY);
+                }}
+              >
+                <CustomNodeCard
+                  data={node.cardData}
+                  accentColor={solidAccent}
+                  chromeAlphaMult={chrome}
+                  readOnly={editorReadOnly}
+                  onPatchTitle={(title) => onPatchCardTitle(node.id, title)}
+                  onAddProperty={() => onAddCardProperty?.(node.id)}
+                  onRemoveProperty={(propId) => onRemoveCardProperty?.(node.id, propId)}
+                  onPatchProperty={(propId, patch, mode) =>
+                    onPatchCardProperty?.(node.id, propId, patch, mode)
+                  }
+                  onRemoveCard={() => onRemoveCard?.(node.id)}
+                />
+              </div>
+            ) : isPluginCard && node.pluginData && onPatchPluginData ? (
               <div
                 className={cn(
                   "min-w-0 flex-1",
@@ -823,7 +867,7 @@ export default function NoteNode({
             )}
             </div>
 
-            {!isPluginCard && !isGameSpecCard && (!!node.imageUrl || imageUploading) && (
+            {!isCustomCard && !isPluginCard && !isGameSpecCard && (!!node.imageUrl || imageUploading) && (
               <div className="group relative mt-2 w-fit max-w-full shrink-0 self-start">
                 {imageUploading && (
                   <div className="flex items-center gap-2 rounded-md border border-cyan-500/35 bg-zinc-950/90 px-3 py-2.5 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.08)]">
@@ -892,14 +936,9 @@ export default function NoteNode({
             onMemoColorSliderUndoGestureEnd={onMemoColorSliderUndoGestureEnd}
             textBatchTargetIds={textBatchTargetIds}
             onPatchNodeContents={onPatchNodeContents}
-            onTurnIntoPlugin={
-              memoType === "music" && !node.pluginData && !node.gameData && onConvertToPluginCard
-                ? () => onConvertToPluginCard(node.id)
-                : undefined
-            }
-            onTurnIntoGameSpec={
-              memoType === "gamedev" && !node.pluginData && !node.gameData && onConvertToGameSpecCard
-                ? () => onConvertToGameSpecCard(node.id)
+            onAddCard={
+              !node.cardData && !node.pluginData && !node.gameData && !editorReadOnly && onAddCard
+                ? () => onAddCard(node.id)
                 : undefined
             }
           />
@@ -996,10 +1035,14 @@ export default function NoteNode({
                   memoType={memoType}
                   onPatchPluginData={onPatchPluginData}
                   onPatchGameData={onPatchGameData}
-                  onConvertToPluginCard={onConvertToPluginCard}
+                  onAddCard={onAddCard}
+                  onPatchCardTitle={onPatchCardTitle}
+                  onAddCardProperty={onAddCardProperty}
+                  onRemoveCardProperty={onRemoveCardProperty}
+                  onPatchCardProperty={onPatchCardProperty}
+                  onRemoveCard={onRemoveCard}
                   themeColor={themeColor}
                   themeChromeAlphaMult={chrome}
-                  onConvertToGameSpecCard={onConvertToGameSpecCard}
                   onMemoColorSliderUndoGestureStart={onMemoColorSliderUndoGestureStart}
                   onMemoColorSliderUndoGestureEnd={onMemoColorSliderUndoGestureEnd}
                   onPatchNodeContents={onPatchNodeContents}
