@@ -32,6 +32,11 @@ import { Menu, MoreVertical, X } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useVisualViewportBottomInsetPx } from "@/hooks/useVisualViewportBottomInsetPx";
 import { useMobileUiStore } from "@/stores/mobileUiStore";
+import { useMemoEditorModulesStore } from "@/stores/memoEditorModulesStore";
+import {
+  isSelectionModifierHeld,
+  isSelectionModeModifierKeyEvent,
+} from "@/lib/selectionModeModifier";
 import type { MemoType } from "@/types/memoKind";
 import type { HeadingLevel, NoteNode } from "@/types/note";
 import type { MessageId } from "@/i18n/messages";
@@ -635,8 +640,9 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedNodeId]); // intentionally NOT re-syncing on content change to keep cursor
 
-  // ── Alt = selection mode (release = resume editing; selectedIds may stay) ───
+  // ── Held modifier = selection mode (release = resume editing; selectedIds may stay) ───
   useEffect(() => {
+    const mod = settings.selectionModeModifier;
     const clearDragging = () => {
       isDragSelectRef.current = false;
       isMarqueeRef.current = false;
@@ -645,12 +651,12 @@ export default function Home() {
       setMarqueeRect(null);
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Alt" || e.repeat) return;
+      if (!isSelectionModeModifierKeyEvent(mod, e) || e.repeat) return;
       isSelectionModeRef.current = true;
       setIsSelectionMode(true);
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key !== "Alt") return;
+      if (!isSelectionModeModifierKeyEvent(mod, e)) return;
       isSelectionModeRef.current = false;
       setIsSelectionMode(false);
       clearDragging();
@@ -668,7 +674,7 @@ export default function Home() {
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, []);
+  }, [settings.selectionModeModifier]);
 
   // ── Global search palette (Ctrl/Cmd + P) ───────────────────────────────────
   useEffect(() => {
@@ -771,7 +777,8 @@ export default function Home() {
   // ── Block selection: Alt+Shift+click / Alt+drag / Alt+marquee ( editors locked while Alt held )
   const handleBlockSelectMouseDown = useCallback((id: string, e: React.MouseEvent) => {
     const mobileSel = useMobileUiStore.getState().isMobileSelectionMode;
-    if (!e.altKey && !mobileSel) return;
+    const modHeld = isSelectionModifierHeld(settings.selectionModeModifier, e);
+    if (!modHeld && !mobileSel) return;
 
     if (e.shiftKey) {
       e.preventDefault();
@@ -801,7 +808,7 @@ export default function Home() {
     blockSelectPointerRef.current = { id, x: e.clientX, y: e.clientY };
     blockSelectRangeDragRef.current = false;
     isDragSelectRef.current = true;
-  }, [selectedIds]);
+  }, [selectedIds, settings.selectionModeModifier]);
 
   const handleMobileSelectNode = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -818,6 +825,26 @@ export default function Home() {
     if (selectedIds.length === 1) return selectedIds[0];
     return activeId ?? mobileOutlineEditorBarNodeId ?? null;
   }, [selectedIds, activeId, mobileOutlineEditorBarNodeId]);
+
+  const mobileActionsTargetNode = useMemo(
+    () =>
+      mobileOutlineActionsAnchorId
+        ? findNodeById(nodes, mobileOutlineActionsAnchorId)
+        : null,
+    [nodes, mobileOutlineActionsAnchorId],
+  );
+
+  const mobileTextBatchTargetIds = useMemo(() => {
+    if (selectedIds.length >= 2) return selectedIds;
+    return mobileOutlineActionsAnchorId ? [mobileOutlineActionsAnchorId] : [];
+  }, [selectedIds, mobileOutlineActionsAnchorId]);
+
+  const showMusicToolbarModule = useMemoEditorModulesStore((s) =>
+    s.isMusicToolbarVisible(activeMemoId, activeMemo.memoType),
+  );
+  const showGamedevToolbarModule = useMemoEditorModulesStore((s) =>
+    s.isGamedevToolbarVisible(activeMemoId, activeMemo.memoType),
+  );
 
   const mobileActionsCopy = useCallback(async () => {
     const text = collectSelectedText(displayNodes, new Set(selectedIds));
@@ -886,6 +913,64 @@ export default function Home() {
     [],
   );
 
+  const mobileSheetIndent = useCallback(() => {
+    if (selectedIds.length >= 2) handleBulkIndent(selectedIds);
+    else if (mobileOutlineActionsAnchorId) handleIndent(mobileOutlineActionsAnchorId);
+  }, [selectedIds, mobileOutlineActionsAnchorId, handleBulkIndent, handleIndent]);
+
+  const mobileSheetOutdent = useCallback(() => {
+    if (selectedIds.length >= 2) handleBulkUnindent(selectedIds);
+    else if (mobileOutlineActionsAnchorId) handleUnindent(mobileOutlineActionsAnchorId);
+  }, [selectedIds, mobileOutlineActionsAnchorId, handleBulkUnindent, handleUnindent]);
+
+  const mobileSheetToggleCollapsed = useCallback(() => {
+    if (!mobileOutlineActionsAnchorId) return;
+    toggleCollapsed(mobileOutlineActionsAnchorId);
+  }, [mobileOutlineActionsAnchorId, toggleCollapsed]);
+
+  const mobileSheetToggleCheckbox = useCallback(() => {
+    if (!mobileOutlineActionsAnchorId) return;
+    toggleHasCheckbox(mobileOutlineActionsAnchorId);
+  }, [mobileOutlineActionsAnchorId, toggleHasCheckbox]);
+
+  const mobileSheetToggleCompleted = useCallback(() => {
+    if (!mobileOutlineActionsAnchorId) return;
+    toggleCompleted(mobileOutlineActionsAnchorId);
+  }, [mobileOutlineActionsAnchorId, toggleCompleted]);
+
+  const mobileSheetSetHeading = useCallback(
+    (level: HeadingLevel) => {
+      const anchor = mobileOutlineActionsAnchorId;
+      if (!anchor) return;
+      handleSetHeading(anchor, level);
+    },
+    [mobileOutlineActionsAnchorId, handleSetHeading],
+  );
+
+  const mobileSheetSetBgColor = useCallback(
+    (color: string | null) => {
+      const anchor = mobileOutlineActionsAnchorId;
+      if (!anchor) return;
+      handleSetBgColor(anchor, color);
+    },
+    [mobileOutlineActionsAnchorId, handleSetBgColor],
+  );
+
+  const mobileSheetAddChild = useCallback(() => {
+    if (!mobileOutlineActionsAnchorId) return;
+    addChild(mobileOutlineActionsAnchorId);
+  }, [mobileOutlineActionsAnchorId, addChild]);
+
+  const mobileSheetAddSibling = useCallback(() => {
+    if (!mobileOutlineActionsAnchorId) return;
+    addSibling(mobileOutlineActionsAnchorId);
+  }, [mobileOutlineActionsAnchorId, addSibling]);
+
+  const mobileSheetToggleNote = useCallback(() => {
+    if (!mobileOutlineActionsAnchorId) return;
+    toggleNote(mobileOutlineActionsAnchorId);
+  }, [mobileOutlineActionsAnchorId, toggleNote]);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (selectedIds.length === 0 || commandPaletteOpen || settingsOpen) return;
@@ -927,7 +1012,8 @@ export default function Home() {
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       const blockSel =
-        e.altKey || useMobileUiStore.getState().isMobileSelectionMode;
+        isSelectionModifierHeld(settings.selectionModeModifier, e) ||
+        useMobileUiStore.getState().isMobileSelectionMode;
       if (!blockSel) {
         if (isMarqueeRef.current || isDragSelectRef.current) {
           isMarqueeRef.current = false;
@@ -1028,7 +1114,7 @@ export default function Home() {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, []);
+  }, [settings.selectionModeModifier]);
 
   // ── Copy: hijack when block selection is active (capture phase) ────────────
   useEffect(() => {
@@ -1237,14 +1323,14 @@ export default function Home() {
           <div
             className={cn(
               "relative z-30 min-h-9 shrink-0 overflow-visible md:h-9 transition-[border-color,background-color] duration-300 ease-in-out",
-              (activeMemo.memoType === "music" && activeMemo.musicMeta) || activeMemo.memoType === "gamedev"
+              (showMusicToolbarModule && activeMemo.musicMeta) || showGamedevToolbarModule
                 ? "bg-zinc-950/95"
                 : "border-b border-zinc-800/35 bg-zinc-950",
             )}
             data-geo-mode-strip
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {activeMemo.memoType === "music" && activeMemo.musicMeta ? (
+            {showMusicToolbarModule && activeMemo.musicMeta ? (
               <TrackStatusBar
                 key={activeMemoId}
                 meta={activeMemo.musicMeta}
@@ -1256,7 +1342,7 @@ export default function Home() {
                 rowTintSourceColor={activeMemoFileItem?.color}
                 readOnly={activeMemoReadOnly}
               />
-            ) : activeMemo.memoType === "gamedev" ? (
+            ) : showGamedevToolbarModule ? (
               <GamedevToolbarStrip
                 onAddSpecCard={() => addGameSpecSibling(activeId)}
                 themeColor={memoThemeColor}
@@ -1396,7 +1482,8 @@ export default function Home() {
               onMouseDown={(e) => {
                 const t = e.target as HTMLElement;
                 const blockSel =
-                  e.altKey || useMobileUiStore.getState().isMobileSelectionMode;
+                  isSelectionModifierHeld(settings.selectionModeModifier, e) ||
+                  useMobileUiStore.getState().isMobileSelectionMode;
                 if (!blockSel) return;
                 if (t.closest('[data-geo-block="note-node"]')) return;
                 if (t.closest("[contenteditable]")) return;
@@ -1484,12 +1571,25 @@ export default function Home() {
         selectedCount={selectedIds.length}
         canPasteAnchor={Boolean(mobileOutlineActionsAnchorId)}
         hasFocusTarget={Boolean(mobileOutlineActionsAnchorId)}
+        targetNode={mobileActionsTargetNode}
+        textBatchTargetIds={mobileTextBatchTargetIds}
+        onPatchNodeContents={patchActiveNodeContents}
         onToggleSelectionMode={() => toggleMobileSelectionMode()}
         onCopy={mobileActionsCopy}
         onCut={mobileActionsCut}
         onPaste={mobileActionsPaste}
         onFocusTargetNode={mobileActionsFocusTarget}
         onDeleteSelection={mobileActionsDeleteSelection}
+        onIndent={mobileSheetIndent}
+        onOutdent={mobileSheetOutdent}
+        onToggleCollapsed={mobileSheetToggleCollapsed}
+        onToggleCheckbox={mobileSheetToggleCheckbox}
+        onToggleCompleted={mobileSheetToggleCompleted}
+        onSetHeading={mobileSheetSetHeading}
+        onSetBgColor={mobileSheetSetBgColor}
+        onAddChild={mobileSheetAddChild}
+        onAddSibling={mobileSheetAddSibling}
+        onToggleNote={mobileSheetToggleNote}
       />
 
       {mobileFabPortalReady &&

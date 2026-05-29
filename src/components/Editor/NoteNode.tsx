@@ -24,6 +24,7 @@ import {
 import type { MemoType } from "@/types/memoKind";
 import type { NoteNode as NoteNodeType, NotePluginData, NoteGameData } from "@/types/note";
 import { useSettings } from "@/contexts/SettingsContext";
+import { isSelectionModifierHeld } from "@/lib/selectionModeModifier";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { uploadFreaviaImageToStorage } from "@/lib/freaviaImageUpload";
 
@@ -477,7 +478,7 @@ export default function NoteNode({
       onMouseDown={(e) => {
         const target = e.target as HTMLElement;
         if (target.closest("button")) return;
-        if (!e.altKey && !isSelectionMode) return;
+        if (!isSelectionModifierHeld(settings.selectionModeModifier, e) && !isSelectionMode) return;
         e.preventDefault();
         e.stopPropagation();
         onSelectStart?.(node.id, e);

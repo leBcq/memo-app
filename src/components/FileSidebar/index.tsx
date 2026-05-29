@@ -935,14 +935,17 @@ export function FileSidebar({
 
   const openItemContextMenuAt = useCallback(
     (item: FileItem, anchor: { x: number; y: number }) => {
-      const menuW = 220;
-      const menuH = item.type === "folder" ? 420 : 520;
-      setContextMenu({
-        kind: "item",
-        item,
-        inviteeMenuMode: inviteeMenuModeForItem(item, memos, currentUserId),
-        x: Math.min(anchor.x, window.innerWidth - menuW - 4),
-        y: Math.min(anchor.y, window.innerHeight - menuH - 4),
+      setContextMenu((prev) => {
+        if (prev?.kind === "item" && prev.item.id === item.id) return null;
+        const menuW = 220;
+        const menuH = item.type === "folder" ? 420 : 520;
+        return {
+          kind: "item",
+          item,
+          inviteeMenuMode: inviteeMenuModeForItem(item, memos, currentUserId),
+          x: Math.min(anchor.x, window.innerWidth - menuW - 4),
+          y: Math.min(anchor.y, window.innerHeight - menuH - 4),
+        };
       });
     },
     [memos, currentUserId],
@@ -1151,32 +1154,6 @@ export function FileSidebar({
           <span>{t("sidebar.standardMemo")}</span>
           {selectedFolderId && <span className="ml-auto text-[9px] text-zinc-700">{t("sidebar.inFolder")}</span>}
         </button>
-        <button
-          type="button"
-          onClick={() => onAddMemo(selectedFolderId, "music")}
-          className={cn(
-            SIDEBAR_MOBILE_FOOTER_BTN,
-            "flex w-full items-center gap-1.5 px-3 font-mono tracking-wide text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-fuchsia-300/90",
-          )}
-        >
-          <span className="text-[12px] leading-none">+</span>
-          <Music2 size={11} className="shrink-0 opacity-80" />
-          <span>{t("sidebar.musicMemo")}</span>
-          {selectedFolderId && <span className="ml-auto text-[9px] text-zinc-700">{t("sidebar.inFolder")}</span>}
-        </button>
-        <button
-          type="button"
-          onClick={() => onAddMemo(selectedFolderId, "gamedev")}
-          className={cn(
-            SIDEBAR_MOBILE_FOOTER_BTN,
-            "flex w-full items-center gap-1.5 px-3 font-mono tracking-wide text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-cyan-300/90",
-          )}
-        >
-          <span className="text-[12px] leading-none">+</span>
-          <Gamepad2 size={11} className="shrink-0 opacity-80" />
-          <span>{t("sidebar.gamedevMemo")}</span>
-          {selectedFolderId && <span className="ml-auto text-[9px] text-zinc-700">{t("sidebar.inFolder")}</span>}
-        </button>
         <button type="button"
           onClick={() => {
             setNewFolderParentId(selectedFolderId);
@@ -1245,24 +1222,6 @@ export function FileSidebar({
               onClick={() => onAddMemo(selectedFolderId, "standard")}
             >
               <FileText size={18} strokeWidth={2} className="shrink-0" />
-            </button>
-            <button
-              type="button"
-              className={cn(SIDEBAR_FOOTER_MOBILE_ICON, "text-fuchsia-300/95 hover:text-fuchsia-200")}
-              title={t("sidebar.musicMemo")}
-              aria-label={t("sidebar.musicMemo")}
-              onClick={() => onAddMemo(selectedFolderId, "music")}
-            >
-              <Music2 size={18} strokeWidth={2} className="shrink-0" />
-            </button>
-            <button
-              type="button"
-              className={SIDEBAR_FOOTER_MOBILE_ICON}
-              title={t("sidebar.gamedevMemo")}
-              aria-label={t("sidebar.gamedevMemo")}
-              onClick={() => onAddMemo(selectedFolderId, "gamedev")}
-            >
-              <Gamepad2 size={18} strokeWidth={2} className="shrink-0" />
             </button>
             <button
               type="button"
@@ -1361,14 +1320,6 @@ export function FileSidebar({
           onClose={() => setContextMenu(null)}
           onAddStandard={() => {
             onAddMemo(null, "standard");
-            setContextMenu(null);
-          }}
-          onAddMusic={() => {
-            onAddMemo(null, "music");
-            setContextMenu(null);
-          }}
-          onAddGamedev={() => {
-            onAddMemo(null, "gamedev");
             setContextMenu(null);
           }}
           onAddFolder={() => {
@@ -1745,14 +1696,12 @@ function NewFolderRow({ depth, value, inputRef, onChange, onCommit, onCancel }: 
 
 function SidebarEmptySpaceContextMenu({
   x, y, onClose,
-  onAddStandard, onAddMusic, onAddGamedev, onAddFolder,
+  onAddStandard, onAddFolder,
 }: {
   x: number;
   y: number;
   onClose: () => void;
   onAddStandard: () => void;
-  onAddMusic: () => void;
-  onAddGamedev: () => void;
   onAddFolder: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -1805,8 +1754,6 @@ function SidebarEmptySpaceContextMenu({
         {t("sidebar.ctx.emptySpaceHint")}
       </p>
       <Row icon={FileText} label={t("sidebar.ctx.newStandardMemo")} onClick={onAddStandard} />
-      <Row icon={Music2} label={t("sidebar.ctx.newMusicMemo")} onClick={onAddMusic} />
-      <Row icon={Gamepad2} label={t("sidebar.ctx.newGamedevMemo")} onClick={onAddGamedev} />
       <div className="mx-2 my-0.5 h-px bg-zinc-800/80" />
       <Row icon={FolderPlus} label={t("sidebar.ctx.newFolder")} onClick={onAddFolder} />
     </div>
@@ -1924,7 +1871,7 @@ function SidebarContextMenu(props: SidebarMenuProps) {
         <button
           type="button"
           aria-label={t("sidebar.ctx.closeBackdrop")}
-          className="fixed inset-0 z-[9998] bg-black/55 backdrop-blur-[1px] md:hidden"
+          className="fixed inset-0 z-[9998] bg-black/30 md:hidden"
           onPointerDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1942,7 +1889,7 @@ function SidebarContextMenu(props: SidebarMenuProps) {
         className={cn(
           "fixed z-[9999] border border-zinc-800 bg-zinc-950 py-0.5 font-mono shadow-xl shadow-black/60",
           mobileDrawerLayout
-            ? "bottom-0 left-0 right-0 max-h-[min(72vh,520px)] w-full overflow-y-auto rounded-t-xl border-zinc-700/80 pb-[max(env(safe-area-inset-bottom),8px)]"
+            ? "bottom-0 left-0 right-0 max-h-[min(58vh,480px)] w-full overflow-y-auto rounded-t-xl border-zinc-700/75 bg-zinc-950/96 pb-[max(env(safe-area-inset-bottom),8px)] shadow-[0_-12px_40px_rgba(0,0,0,0.4)] backdrop-blur-sm"
             : "w-[220px]",
         )}
         style={mobileDrawerLayout ? undefined : { top: y, left: x }}
@@ -1950,8 +1897,6 @@ function SidebarContextMenu(props: SidebarMenuProps) {
       {item.type === "folder" ? (
         <>
           <Row icon={FileText} label={t("sidebar.ctx.newStandardMemo")} onClick={() => onAddMemoInside("standard")} />
-          <Row icon={Music2} label={t("sidebar.ctx.newMusicMemo")} onClick={() => onAddMemoInside("music")} />
-          <Row icon={Gamepad2} label={t("sidebar.ctx.newGamedevMemo")} onClick={() => onAddMemoInside("gamedev")} />
           <Row icon={FolderPlus} label={t("sidebar.ctx.newFolder")} onClick={onAddFolderInside} />
           <Divider />
           <Row

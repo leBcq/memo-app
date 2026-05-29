@@ -10,6 +10,12 @@ import {
   DEFAULT_APPEARANCE,
   type KeymapSettings,
 } from "@/contexts/SettingsContext";
+import {
+  DEFAULT_SELECTION_MODE_MODIFIER,
+  SELECTION_MODE_MODIFIER_OPTIONS,
+  selectionModeModifierLabel,
+  type SelectionModeModifier,
+} from "@/lib/selectionModeModifier";
 import type { KeyCombo } from "@/config/keybinds";
 import { useTranslation } from "@/i18n/useTranslation";
 
@@ -96,7 +102,7 @@ function KeymapRow({
 
 function KeymapTab() {
   const { t } = useTranslation();
-  const { settings, updateKeymap } = useSettings();
+  const { settings, updateKeymap, updateSelectionModeModifier } = useSettings();
   const [capturingKey, setCapturingKey] = useState<keyof KeymapSettings | null>(null);
 
   const keymapActions = useMemo(
@@ -119,6 +125,28 @@ function KeymapTab() {
         {t("settings.keymapHint")}
       </p>
 
+      <div className="rounded-sm border border-zinc-800/70 bg-zinc-900/30 px-3 py-3">
+        <p className="mb-1 text-[11px] tracking-wide text-zinc-200">{t("settings.selectionModeModifier")}</p>
+        <p className="mb-2 text-[10px] text-zinc-600">{t("settings.selectionModeModifierDesc")}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {SELECTION_MODE_MODIFIER_OPTIONS.map((mod) => (
+            <button
+              key={mod}
+              type="button"
+              onClick={() => updateSelectionModeModifier(mod)}
+              className={cn(
+                "border px-2.5 py-1 font-mono text-[10px] tracking-wide transition-colors",
+                settings.selectionModeModifier === mod
+                  ? "border-cyan-500/55 bg-cyan-950/35 text-cyan-200"
+                  : "border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200",
+              )}
+            >
+              {selectionModeModifierLabel(mod)}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex flex-col gap-2">
         {keymapActions.map(({ key, label, desc }) => (
           <KeymapRow
@@ -135,8 +163,15 @@ function KeymapTab() {
         ))}
       </div>
 
-      <button type="button" onClick={() => { updateKeymap(DEFAULT_KEYMAP); setCapturingKey(null); }}
-        className="self-start border border-zinc-800 px-3 py-1 text-[10px] tracking-wide text-zinc-600 transition-colors hover:border-zinc-600 hover:text-zinc-300">
+      <button
+        type="button"
+        onClick={() => {
+          updateKeymap(DEFAULT_KEYMAP);
+          updateSelectionModeModifier(DEFAULT_SELECTION_MODE_MODIFIER);
+          setCapturingKey(null);
+        }}
+        className="self-start border border-zinc-800 px-3 py-1 text-[10px] tracking-wide text-zinc-600 transition-colors hover:border-zinc-600 hover:text-zinc-300"
+      >
         {t("settings.keymapReset")}
       </button>
     </div>

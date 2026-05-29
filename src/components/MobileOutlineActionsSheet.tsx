@@ -1,7 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { attachChromeProofTap } from "@/lib/chromeProofPointerHandlers";
+import { MobileOutlineNodeToolsPanel } from "@/components/MobileOutlineNodeToolsPanel";
+import type { HeadingLevel, NoteNode } from "@/types/note";
 import type { MessageId } from "@/i18n/messages";
 import { useTranslation } from "@/i18n/useTranslation";
 
@@ -13,12 +14,25 @@ export type MobileOutlineActionsSheetProps = {
   selectedCount: number;
   canPasteAnchor: boolean;
   hasFocusTarget: boolean;
+  targetNode: NoteNode | null;
+  textBatchTargetIds: string[];
+  onPatchNodeContents: (patches: Record<string, string>) => void;
   onToggleSelectionMode: () => void;
   onCopy: () => void | Promise<void>;
   onCut: () => void | Promise<void>;
   onPaste: () => void | Promise<void>;
   onFocusTargetNode: () => void;
   onDeleteSelection: () => void;
+  onIndent: () => void;
+  onOutdent: () => void;
+  onToggleCollapsed: () => void;
+  onToggleCheckbox: () => void;
+  onToggleCompleted: () => void;
+  onSetHeading: (level: HeadingLevel) => void;
+  onSetBgColor: (color: string | null) => void;
+  onAddChild: () => void;
+  onAddSibling: () => void;
+  onToggleNote: () => void;
 };
 
 function SheetRow({
@@ -33,16 +47,20 @@ function SheetRow({
   onActivate: () => void | Promise<void>;
 }) {
   const { t } = useTranslation();
-  const tap = attachChromeProofTap({
-    onActivate: () => {
-      void onActivate();
-    },
-    disabled,
-  });
   return (
     <button
-      {...tap}
+      type="button"
+      tabIndex={-1}
       disabled={disabled}
+      onPointerDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (disabled) return;
+        void onActivate();
+      }}
       className={cn(
         "flex w-full touch-manipulation items-center justify-between border-b border-zinc-800/70 px-4 py-3.5 text-left font-mono text-[13px] tracking-wide transition-colors",
         destructive ? "text-red-400/95 hover:bg-red-950/25" : "text-zinc-200 hover:bg-zinc-900/90",
@@ -63,20 +81,29 @@ export function MobileOutlineActionsSheet({
   selectedCount,
   canPasteAnchor,
   hasFocusTarget,
+  targetNode,
+  textBatchTargetIds,
+  onPatchNodeContents,
   onToggleSelectionMode,
   onCopy,
   onCut,
   onPaste,
   onFocusTargetNode,
   onDeleteSelection,
+  onIndent,
+  onOutdent,
+  onToggleCollapsed,
+  onToggleCheckbox,
+  onToggleCompleted,
+  onSetHeading,
+  onSetBgColor,
+  onAddChild,
+  onAddSibling,
+  onToggleNote,
 }: MobileOutlineActionsSheetProps) {
   const { t } = useTranslation();
 
   if (!open) return null;
-
-  const backdropTap = attachChromeProofTap({
-    onActivate: onClose,
-  });
 
   const selectionLabel: MessageId = isMobileSelectionMode
     ? "mobile.actionsMenu.selectionOff"
@@ -89,25 +116,38 @@ export function MobileOutlineActionsSheet({
   const deleteDisabled = readOnly || selectedCount === 0;
 
   return (
-    <div className="fixed inset-0 z-[92] md:hidden" data-mobile-outline-actions-sheet="true" aria-modal role="dialog" aria-label={t("mobile.actionsMenu.dialogAria")}>
+    <div
+      className="fixed inset-0 z-[9998] md:hidden"
+      data-mobile-outline-actions-sheet="true"
+      aria-modal
+      role="dialog"
+      aria-label={t("mobile.actionsMenu.dialogAria")}
+    >
       <button
-        {...backdropTap}
+        type="button"
+        tabIndex={-1}
         aria-label={t("mobile.actionsMenu.closeBackdrop")}
-        className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-black/30"
+        onPointerDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }}
+        onTouchStart={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }}
       />
       <div
         className={cn(
-          "absolute bottom-0 left-0 right-0 max-h-[min(72vh,520px)] overflow-y-auto rounded-t-xl border border-zinc-700/80 bg-zinc-950 pb-[max(env(safe-area-inset-bottom),12px)] shadow-[0_-16px_48px_rgba(0,0,0,0.55)]",
+          "absolute bottom-0 left-0 right-0 flex max-h-[min(58vh,480px)] flex-col overflow-hidden rounded-t-xl border border-zinc-700/75 bg-zinc-950/96 pb-[max(env(safe-area-inset-bottom),10px)] shadow-[0_-12px_40px_rgba(0,0,0,0.45)] backdrop-blur-sm",
         )}
       >
-        <div className="flex flex-col px-1 pt-2">
-          <div className="mx-auto mb-2 h-1 w-10 shrink-0 rounded-full bg-zinc-700/90" aria-hidden />
-          <SheetRow
-            labelId={selectionLabel}
-            onActivate={() => {
-              onToggleSelectionMode();
-            }}
-          />
+        <div className="mx-auto mt-2 mb-1 h-1 w-10 shrink-0 rounded-full bg-zinc-600/90" aria-hidden />
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <SheetRow labelId={selectionLabel} onActivate={onToggleSelectionMode} />
           <SheetRow labelId="mobile.actionsMenu.copy" disabled={copyDisabled} onActivate={onCopy} />
           <SheetRow labelId="mobile.actionsMenu.cut" disabled={cutDisabled} onActivate={onCut} />
           <SheetRow labelId="mobile.actionsMenu.paste" disabled={pasteDisabled} onActivate={onPaste} />
@@ -122,8 +162,26 @@ export function MobileOutlineActionsSheet({
             disabled={deleteDisabled}
             onActivate={onDeleteSelection}
           />
-          <SheetRow labelId="mobile.actionsMenu.close" onActivate={onClose} />
+
+          <MobileOutlineNodeToolsPanel
+            readOnly={readOnly}
+            targetNode={targetNode}
+            textBatchTargetIds={textBatchTargetIds}
+            onPatchNodeContents={onPatchNodeContents}
+            onIndent={onIndent}
+            onOutdent={onOutdent}
+            onToggleCollapsed={onToggleCollapsed}
+            onToggleCheckbox={onToggleCheckbox}
+            onToggleCompleted={onToggleCompleted}
+            onSetHeading={onSetHeading}
+            onSetBgColor={onSetBgColor}
+            onFocusNode={onFocusTargetNode}
+            onAddChild={onAddChild}
+            onAddSibling={onAddSibling}
+            onToggleNote={onToggleNote}
+          />
         </div>
+        <SheetRow labelId="mobile.actionsMenu.close" onActivate={onClose} />
       </div>
     </div>
   );

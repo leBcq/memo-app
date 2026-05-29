@@ -9,6 +9,11 @@ import {
   useState,
 } from "react";
 import type { KeyCombo } from "@/config/keybinds";
+import type { SelectionModeModifier } from "@/lib/selectionModeModifier";
+import {
+  DEFAULT_SELECTION_MODE_MODIFIER,
+  normalizeSelectionModeModifier,
+} from "@/lib/selectionModeModifier";
 import type { UiLocale } from "@/i18n/messages";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -36,6 +41,8 @@ export type AppearanceSettings = {
 
 export type Settings = {
   keymap: KeymapSettings;
+  /** Held modifier for block-selection mode (Ctrl / Alt / Shift / Meta). */
+  selectionModeModifier: SelectionModeModifier;
   appearance: AppearanceSettings;
 };
 
@@ -60,6 +67,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
 
 const DEFAULT_SETTINGS: Settings = {
   keymap: DEFAULT_KEYMAP,
+  selectionModeModifier: DEFAULT_SELECTION_MODE_MODIFIER,
   appearance: DEFAULT_APPEARANCE,
 };
 
@@ -108,6 +116,9 @@ function loadFromStorage(): Settings {
     }
     return {
       keymap: { ...DEFAULT_KEYMAP, ...(parsed.keymap ?? {}) },
+      selectionModeModifier: normalizeSelectionModeModifier(
+        (parsed as Partial<Settings>).selectionModeModifier,
+      ),
       appearance,
     };
   } catch {
@@ -120,6 +131,7 @@ function loadFromStorage(): Settings {
 type SettingsContextValue = {
   settings: Settings;
   updateKeymap: (patch: Partial<KeymapSettings>) => void;
+  updateSelectionModeModifier: (mod: SelectionModeModifier) => void;
   updateAppearance: (patch: Partial<AppearanceSettings>) => void;
   resetSettings: () => void;
 };
@@ -127,6 +139,7 @@ type SettingsContextValue = {
 const SettingsContext = createContext<SettingsContextValue>({
   settings: DEFAULT_SETTINGS,
   updateKeymap: () => {},
+  updateSelectionModeModifier: () => {},
   updateAppearance: () => {},
   resetSettings: () => {},
 });
@@ -166,6 +179,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setSettings((prev) => ({ ...prev, keymap: { ...prev.keymap, ...patch } }));
   }, []);
 
+  const updateSelectionModeModifier = useCallback((mod: SelectionModeModifier) => {
+    setSettings((prev) => ({ ...prev, selectionModeModifier: mod }));
+  }, []);
+
   const updateAppearance = useCallback((patch: Partial<AppearanceSettings>) => {
     setSettings((prev) => ({ ...prev, appearance: { ...prev.appearance, ...patch } }));
   }, []);
@@ -175,8 +192,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ settings, updateKeymap, updateAppearance, resetSettings }),
-    [settings, updateKeymap, updateAppearance, resetSettings],
+    () => ({
+      settings,
+      updateKeymap,
+      updateSelectionModeModifier,
+      updateAppearance,
+      resetSettings,
+    }),
+    [settings, updateKeymap, updateSelectionModeModifier, updateAppearance, resetSettings],
   );
 
   return (
