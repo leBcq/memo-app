@@ -1,6 +1,6 @@
 "use client";
 
-import { FileStack } from "lucide-react";
+import { FileStack, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FileItemColor } from "@/types/fileSystem";
 import {
@@ -19,6 +19,8 @@ type Props = {
   /** Raw sidebar `FileItem.color` — forces borderless badge when alpha is 0 in storage. */
   rowTintSourceColor?: FileItemColor | null;
   readOnly?: boolean;
+  /** When provided, renders a close/disable button at the right end. */
+  onClose?: () => void;
 };
 
 /** Thin toolbar row for gamedev memos (mirrors music strip height / chrome). */
@@ -28,6 +30,7 @@ export function GamedevToolbarStrip({
   themeChromeAlphaMult = 1,
   rowTintSourceColor,
   readOnly = false,
+  onClose,
 }: Props) {
   const { t } = useTranslation();
   const chrome = themeChromeAlphaMult;
@@ -95,6 +98,19 @@ export function GamedevToolbarStrip({
           </span>
         </button>
       </div>
+
+      {onClose && (
+        <button
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          className="flex shrink-0 items-center justify-center border-l border-zinc-800/80 px-2.5 text-zinc-600 transition-colors hover:bg-zinc-900/80 hover:text-zinc-300"
+          aria-label={t("strip.closeModuleAria")}
+          title={t("strip.closeModuleAria")}
+        >
+          <X size={11} strokeWidth={2.5} aria-hidden />
+        </button>
+      )}
     </div>
   );
 }

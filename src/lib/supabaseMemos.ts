@@ -77,7 +77,9 @@ function parseContentV1(raw: unknown): Omit<FreaviaMemoContentV1, "v"> & { v?: n
   const r = raw as Record<string, unknown>;
   const memoType = normalizeMemoType(r.memoType);
   const musicMeta =
-    memoType === "music" ? normalizeMusicMeta(r.musicMeta ?? DEFAULT_MUSIC_META) : null;
+    memoType === "music" || r.musicMeta != null
+      ? normalizeMusicMeta(r.musicMeta ?? DEFAULT_MUSIC_META)
+      : null;
   const gamedevMeta =
     memoType === "gamedev" ? normalizeGamedevMetaRaw(r.gamedevMeta) : null;
   const nodes = Array.isArray(r.nodes)

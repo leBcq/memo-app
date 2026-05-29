@@ -42,7 +42,7 @@ create policy "memo_shares_insert_owner"
   for insert
   with check (public.memo_is_owned_by_auth_user(memo_id));
 
-create policy "memo_shares_update_owner"
+create policy "memo_shaabout:blank#blockedres_update_owner"
   on public.memo_shares
   for update
   using (public.memo_is_owned_by_auth_user(memo_id))

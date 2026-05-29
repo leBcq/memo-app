@@ -28,7 +28,7 @@ import {
   EDITOR_STANDARD_TEXT_COLOR,
   EDITOR_STANDARD_CARET_COLOR,
 } from "@/lib/memoThemeColor";
-import { Menu, MoreVertical, X } from "lucide-react";
+import { Gamepad2, Menu, MoreVertical, Music2, X } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useVisualViewportBottomInsetPx } from "@/hooks/useVisualViewportBottomInsetPx";
 import { useMobileUiStore } from "@/stores/mobileUiStore";
@@ -331,6 +331,7 @@ export default function Home() {
     switchMemo,
     addMemo,
     setMemoType,
+    initMusicModuleForMemo,
     patchActiveMusicMeta,
     updateMemoTitle,
     fileItems,
@@ -419,6 +420,32 @@ export default function Home() {
     addMemo(parentId, kind);
     requestAnimationFrame(() => titleRef.current?.focus());
   };
+
+  const handleEnableMusicModule = useCallback(() => {
+    initMusicModuleForMemo(activeMemoId);
+    useMemoEditorModulesStore.getState().setModuleFlag(activeMemoId, "musicToolbar", true);
+  }, [activeMemoId, initMusicModuleForMemo]);
+
+  const handleEnableGamedevModule = useCallback(() => {
+    useMemoEditorModulesStore.getState().setModuleFlag(activeMemoId, "gamedevToolbar", true);
+  }, [activeMemoId]);
+
+  const handleCloseMusicModule = useCallback(() => {
+    useMemoEditorModulesStore.getState().setModuleFlag(activeMemoId, "musicToolbar", false);
+  }, [activeMemoId]);
+
+  const handleCloseGamedevModule = useCallback(() => {
+    useMemoEditorModulesStore.getState().setModuleFlag(activeMemoId, "gamedevToolbar", false);
+  }, [activeMemoId]);
+
+  const handleToggleMusicModuleForMemo = useCallback((memoId: string) => {
+    initMusicModuleForMemo(memoId);
+    useMemoEditorModulesStore.getState().toggleModuleFlag(memoId, "musicToolbar");
+  }, [initMusicModuleForMemo]);
+
+  const handleToggleGamedevModuleForMemo = useCallback((memoId: string) => {
+    useMemoEditorModulesStore.getState().toggleModuleFlag(memoId, "gamedevToolbar");
+  }, []);
 
   // ── Focus mode helpers ────────────────────────────────────────────────────
   const focusedPath = useMemo(
@@ -1230,6 +1257,8 @@ export default function Home() {
               }}
               onAddMemo={handleAddMemo}
               onSetMemoType={setMemoType}
+              onToggleMusicModule={handleToggleMusicModuleForMemo}
+              onToggleGamedevModule={handleToggleGamedevModuleForMemo}
               onAddFolder={addFolder}
               onToggleFolder={toggleFolder}
               onRenameItem={renameItem}
@@ -1319,41 +1348,78 @@ export default function Home() {
             </span>
           </div>
 
-          {/* Mode strip: music tools or gamedev spec tools */}
-          <div
-            className={cn(
-              "relative z-30 min-h-9 shrink-0 overflow-visible md:h-9 transition-[border-color,background-color] duration-300 ease-in-out",
-              (showMusicToolbarModule && activeMemo.musicMeta) || showGamedevToolbarModule
-                ? "bg-zinc-950/95"
-                : "border-b border-zinc-800/35 bg-zinc-950",
-            )}
-            data-geo-mode-strip
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            {showMusicToolbarModule && activeMemo.musicMeta ? (
-              <TrackStatusBar
-                key={activeMemoId}
-                meta={activeMemo.musicMeta}
-                onPatch={patchActiveMusicMeta}
-                onInsertStructure={() => insertElectronicSongStructure(activeId)}
-                onAddPlugin={() => addPluginSibling(activeId)}
-                themeColor={memoThemeColor}
-                themeChromeAlphaMult={themeChromeAlphaMult}
-                rowTintSourceColor={activeMemoFileItem?.color}
-                readOnly={activeMemoReadOnly}
-              />
-            ) : showGamedevToolbarModule ? (
-              <GamedevToolbarStrip
-                onAddSpecCard={() => addGameSpecSibling(activeId)}
-                themeColor={memoThemeColor}
-                themeChromeAlphaMult={themeChromeAlphaMult}
-                rowTintSourceColor={activeMemoFileItem?.color}
-                readOnly={activeMemoReadOnly}
-              />
-            ) : (
-              <div className="min-h-9 w-full md:h-9" aria-hidden />
-            )}
-          </div>
+          {/* Mode strip: music / gamedev module strips or activation buttons */}
+          {(() => {
+            const isLegacyMusicMemo = activeMemo.memoType === "music";
+            const isLegacyGamedevMemo = activeMemo.memoType === "gamedev";
+            const stripActive = (showMusicToolbarModule && activeMemo.musicMeta) || showGamedevToolbarModule;
+            const showActivationBar =
+              !stripActive &&
+              activeMemo.memoType === "standard" &&
+              !activeMemoReadOnly;
+            return (
+              <div
+                className={cn(
+                  "relative z-30 min-h-9 shrink-0 overflow-visible md:h-9 transition-[border-color,background-color] duration-300 ease-in-out",
+                  stripActive
+                    ? "bg-zinc-950/95"
+                    : "border-b border-zinc-800/35 bg-zinc-950",
+                )}
+                data-geo-mode-strip
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {showMusicToolbarModule && activeMemo.musicMeta ? (
+                  <TrackStatusBar
+                    key={activeMemoId}
+                    meta={activeMemo.musicMeta}
+                    onPatch={patchActiveMusicMeta}
+                    onInsertStructure={() => insertElectronicSongStructure(activeId)}
+                    onAddPlugin={() => addPluginSibling(activeId)}
+                    themeColor={memoThemeColor}
+                    themeChromeAlphaMult={themeChromeAlphaMult}
+                    rowTintSourceColor={activeMemoFileItem?.color}
+                    readOnly={activeMemoReadOnly}
+                    onClose={!isLegacyMusicMemo ? handleCloseMusicModule : undefined}
+                  />
+                ) : showGamedevToolbarModule ? (
+                  <GamedevToolbarStrip
+                    onAddSpecCard={() => addGameSpecSibling(activeId)}
+                    themeColor={memoThemeColor}
+                    themeChromeAlphaMult={themeChromeAlphaMult}
+                    rowTintSourceColor={activeMemoFileItem?.color}
+                    readOnly={activeMemoReadOnly}
+                    onClose={!isLegacyGamedevMemo ? handleCloseGamedevModule : undefined}
+                  />
+                ) : showActivationBar ? (
+                  <div className="flex min-h-9 w-full items-center gap-1 px-3">
+                    <span className="mr-1 hidden text-[8px] tracking-[2px] text-zinc-700 md:inline">
+                      {t("strip.modulesLabel")}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleEnableMusicModule}
+                      className="flex items-center gap-1.5 border border-zinc-800/60 px-2 py-[3px] font-mono text-[9px] tracking-wide text-zinc-600 transition-colors hover:border-fuchsia-500/40 hover:text-fuchsia-300"
+                      title={t("strip.enableMusic")}
+                    >
+                      <Music2 size={9} className="shrink-0" aria-hidden />
+                      <span>{t("strip.enableMusic")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleEnableGamedevModule}
+                      className="flex items-center gap-1.5 border border-zinc-800/60 px-2 py-[3px] font-mono text-[9px] tracking-wide text-zinc-600 transition-colors hover:border-cyan-500/40 hover:text-cyan-300"
+                      title={t("strip.enableGamedev")}
+                    >
+                      <Gamepad2 size={9} className="shrink-0" aria-hidden />
+                      <span>{t("strip.enableGamedev")}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="min-h-9 w-full md:h-9" aria-hidden />
+                )}
+              </div>
+            );
+          })()}
 
           <div
             className={cn(

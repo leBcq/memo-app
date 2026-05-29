@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "@/i18n/useTranslation";
 import { useShareModalStore } from "@/stores/shareModalStore";
 import { useSidebarFileSelectionStore } from "@/stores/sidebarFileSelectionStore";
+import { useMemoEditorModulesStore } from "@/stores/memoEditorModulesStore";
 import { getMemoThemeColor, hexToRgba } from "@/lib/memoThemeColor";
 import type { FileItem, FileItemColor, FileItemLabelPreset } from "@/types/fileSystem";
 import { SHARED_WITH_ME_SIDEBAR_PARENT_ID } from "@/types/fileSystem";
@@ -125,6 +126,8 @@ type Props = {
   onSelectMemo: (id: string) => void;
   onAddMemo: (parentId: string | null, kind: MemoType) => void;
   onSetMemoType: (memoId: string, kind: MemoType) => void;
+  onToggleMusicModule: (memoId: string) => void;
+  onToggleGamedevModule: (memoId: string) => void;
   onAddFolder: (parentId: string | null, name: string) => void;
   onToggleFolder: (id: string) => void;
   onRenameItem: (id: string, name: string) => void;
@@ -851,6 +854,8 @@ export function FileSidebar({
   onImportFullBackup,
   onMemoColorSliderUndoGestureStart,
   onMemoColorSliderUndoGestureEnd,
+  onToggleMusicModule,
+  onToggleGamedevModule,
   mobileDrawerLayout,
 }: Props) {
   const { t } = useTranslation();
@@ -1289,6 +1294,14 @@ export function FileSidebar({
           }}
           onSetMemoType={(kind) => {
             onSetMemoType(contextMenu.item.id, kind);
+            setContextMenu(null);
+          }}
+          onToggleMusicModule={() => {
+            onToggleMusicModule(contextMenu.item.id);
+            setContextMenu(null);
+          }}
+          onToggleGamedevModule={() => {
+            onToggleGamedevModule(contextMenu.item.id);
             setContextMenu(null);
           }}
           onAddFolderInside={() => {
@@ -1782,6 +1795,8 @@ type SidebarMenuProps = {
   onArchive: () => void;
   onShare: () => void;
   onSetMemoType?: (kind: MemoType) => void;
+  onToggleMusicModule?: () => void;
+  onToggleGamedevModule?: () => void;
   onSetItemLabelColor: (color: FileItemColor | null, opts?: { skipHistory?: boolean }) => void;
   onMemoColorSliderUndoGestureStart?: () => void;
   onMemoColorSliderUndoGestureEnd?: () => void;
@@ -1794,11 +1809,19 @@ function SidebarContextMenu(props: SidebarMenuProps) {
   const { item, activeMemoId, x, y, mobileDrawerLayout = false, onClose, onRename, onDelete,
     onAddMemoInside, onAddFolderInside,
     onDuplicate, onToggleFavorite, onChangeIcon, onExport, onArchive, onShare,
-    onSetMemoType, onSetItemLabelColor,
+    onSetMemoType, onToggleMusicModule, onToggleGamedevModule, onSetItemLabelColor,
     onMemoColorSliderUndoGestureStart,
     onMemoColorSliderUndoGestureEnd,
     inviteeMenuMode,
   } = props;
+
+  const musicModuleOn = useMemoEditorModulesStore((s) =>
+    s.isMusicToolbarVisible(item.id, item.memoType ?? "standard"),
+  );
+  const gamedevModuleOn = useMemoEditorModulesStore((s) =>
+    s.isGamedevToolbarVisible(item.id, item.memoType ?? "standard"),
+  );
+  const isStandardMemo = item.type === "memo" && (item.memoType === "standard" || !item.memoType);
   const ref = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
   const isViewerInvitee = item.type === "memo" && inviteeMenuMode === "viewer";
@@ -1939,26 +1962,24 @@ function SidebarContextMenu(props: SidebarMenuProps) {
             onClick={onToggleFavorite}
           />
           <Row icon={Smile} label={t("sidebar.ctx.changeIcon")} onClick={onChangeIcon} />
-          <Divider />
-          <p className="px-3 pb-0.5 pt-1 font-mono text-[8px] tracking-wider text-zinc-600">{t("sidebar.ctx.changeType")}</p>
-          <Row
-            icon={FileText}
-            label={t("sidebar.ctx.typeStandard")}
-            active={(item.memoType ?? "standard") === "standard"}
-            onClick={() => onSetMemoType?.("standard")}
-          />
-          <Row
-            icon={Music2}
-            label={t("sidebar.ctx.typeMusic")}
-            active={item.memoType === "music"}
-            onClick={() => onSetMemoType?.("music")}
-          />
-          <Row
-            icon={Gamepad2}
-            label={t("sidebar.ctx.typeGamedev")}
-            active={item.memoType === "gamedev"}
-            onClick={() => onSetMemoType?.("gamedev")}
-          />
+          {isStandardMemo && (
+            <>
+              <Divider />
+              <p className="px-3 pb-0.5 pt-1 font-mono text-[8px] tracking-wider text-zinc-600">{t("sidebar.ctx.modules")}</p>
+              <Row
+                icon={Music2}
+                label={t("sidebar.ctx.musicModule")}
+                active={musicModuleOn}
+                onClick={() => onToggleMusicModule?.()}
+              />
+              <Row
+                icon={Gamepad2}
+                label={t("sidebar.ctx.gamedevModule")}
+                active={gamedevModuleOn}
+                onClick={() => onToggleGamedevModule?.()}
+              />
+            </>
+          )}
           <Divider />
           <Row icon={Pencil} label={t("sidebar.ctx.rename")} onClick={onRename} />
           <Divider />
@@ -1985,26 +2006,24 @@ function SidebarContextMenu(props: SidebarMenuProps) {
           <Row icon={Copy}      label={t("sidebar.ctx.duplicate")}    onClick={onDuplicate} />
           <Row icon={Share2}    label={t("sidebar.ctx.share")}       onClick={onShare} />
           <Row icon={Smile}     label={t("sidebar.ctx.changeIcon")}    onClick={onChangeIcon} />
-          <Divider />
-          <p className="px-3 pb-0.5 pt-1 font-mono text-[8px] tracking-wider text-zinc-600">{t("sidebar.ctx.changeType")}</p>
-          <Row
-            icon={FileText}
-            label={t("sidebar.ctx.typeStandard")}
-            active={(item.memoType ?? "standard") === "standard"}
-            onClick={() => onSetMemoType?.("standard")}
-          />
-          <Row
-            icon={Music2}
-            label={t("sidebar.ctx.typeMusic")}
-            active={item.memoType === "music"}
-            onClick={() => onSetMemoType?.("music")}
-          />
-          <Row
-            icon={Gamepad2}
-            label={t("sidebar.ctx.typeGamedev")}
-            active={item.memoType === "gamedev"}
-            onClick={() => onSetMemoType?.("gamedev")}
-          />
+          {isStandardMemo && (
+            <>
+              <Divider />
+              <p className="px-3 pb-0.5 pt-1 font-mono text-[8px] tracking-wider text-zinc-600">{t("sidebar.ctx.modules")}</p>
+              <Row
+                icon={Music2}
+                label={t("sidebar.ctx.musicModule")}
+                active={musicModuleOn}
+                onClick={() => onToggleMusicModule?.()}
+              />
+              <Row
+                icon={Gamepad2}
+                label={t("sidebar.ctx.gamedevModule")}
+                active={gamedevModuleOn}
+                onClick={() => onToggleGamedevModule?.()}
+              />
+            </>
+          )}
           <Divider />
           <Row icon={Pencil}    label={t("sidebar.ctx.rename")}         onClick={onRename} />
           <Divider />

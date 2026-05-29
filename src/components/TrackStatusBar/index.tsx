@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, MoreHorizontal } from "lucide-react";
+import { ChevronDown, ChevronUp, MoreHorizontal, X } from "lucide-react";
 import type { MemoMusicMeta } from "@/types/memoKind";
 import { clampBpm, keyQualityToScale, scaleToKeyQuality } from "@/types/memoKind";
 import { NOTE_ROOTS } from "@/types/song";
@@ -28,6 +28,8 @@ type TrackStatusBarProps = {
   rowTintSourceColor?: FileItemColor | null;
   /** Shared viewer: strip is display-only. */
   readOnly?: boolean;
+  /** When provided, renders a close/disable button at the right end. */
+  onClose?: () => void;
 };
 
 export function TrackStatusBar({
@@ -39,6 +41,7 @@ export function TrackStatusBar({
   themeChromeAlphaMult = 1,
   rowTintSourceColor,
   readOnly = false,
+  onClose,
 }: TrackStatusBarProps) {
   const { t } = useTranslation();
   const chrome = themeChromeAlphaMult;
@@ -456,6 +459,19 @@ export function TrackStatusBar({
             setKeyOpen(false);
           }}
         />
+
+        {onClose && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
+            className="flex shrink-0 items-center justify-center border-l border-zinc-800/80 px-2.5 text-zinc-600 transition-colors hover:bg-zinc-900/80 hover:text-zinc-300"
+            aria-label={t("strip.closeModuleAria")}
+            title={t("strip.closeModuleAria")}
+          >
+            <X size={11} strokeWidth={2.5} aria-hidden />
+          </button>
+        )}
       </div>
     </div>
   );

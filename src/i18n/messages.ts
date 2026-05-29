@@ -127,6 +127,9 @@ const messagesEn = {
   "sidebar.ctx.typeStandard": "Standard",
   "sidebar.ctx.typeMusic": "Music",
   "sidebar.ctx.typeGamedev": "Game dev",
+  "sidebar.ctx.modules": "MODULES",
+  "sidebar.ctx.musicModule": "Music module",
+  "sidebar.ctx.gamedevModule": "Game dev module",
   "sidebar.ctx.archive": "Archive",
   "sidebar.ctx.labelSection": "MEMO COLOR",
   "sidebar.ctx.share": "Share…",
@@ -170,6 +173,12 @@ const messagesEn = {
   "gamedev.addSpecCard": "Add Spec Card",
   "gamedev.addSpecSub": "Spec",
   "gamedev.addSpecTitle": "Insert a game spec card after the active row (or at root end)",
+
+  // Module strip (activation bar + close)
+  "strip.enableMusic": "Music",
+  "strip.enableGamedev": "GameDev",
+  "strip.modulesLabel": "MODULES",
+  "strip.closeModuleAria": "Disable module",
 
   // Plugin card
   "plugin.labelName": "NAME",
@@ -417,6 +426,9 @@ const messagesJa: Record<MessageId, string> = {
   "sidebar.ctx.typeStandard": "標準",
   "sidebar.ctx.typeMusic": "音楽",
   "sidebar.ctx.typeGamedev": "ゲーム開発",
+  "sidebar.ctx.modules": "モジュール",
+  "sidebar.ctx.musicModule": "音楽モジュール",
+  "sidebar.ctx.gamedevModule": "ゲーム開発モジュール",
   "sidebar.ctx.archive": "アーカイブ",
   "sidebar.ctx.labelSection": "メモの色",
   "sidebar.ctx.share": "共有…",
@@ -458,6 +470,12 @@ const messagesJa: Record<MessageId, string> = {
   "gamedev.addSpecCard": "仕様書を追加",
   "gamedev.addSpecSub": "Spec",
   "gamedev.addSpecTitle": "アクティブ行の直後にゲーム仕様カードを追加",
+
+  // Module strip (activation bar + close)
+  "strip.enableMusic": "Music",
+  "strip.enableGamedev": "GameDev",
+  "strip.modulesLabel": "MODULES",
+  "strip.closeModuleAria": "モジュールを無効化",
 
   "plugin.labelName": "名前",
   "plugin.labelCategory": "カテゴリ",

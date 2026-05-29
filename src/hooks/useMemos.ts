@@ -235,7 +235,7 @@ function normalizeGamedevMeta(raw: unknown): MemoGamedevMeta {
 function normalizeMemo(raw: Partial<Memo> & { nodes?: unknown }): Memo {
   const memoType = normalizeMemoType(raw.memoType);
   const musicMeta =
-    memoType === "music"
+    memoType === "music" || raw.musicMeta != null
       ? normalizeMusicMeta(raw.musicMeta)
       : null;
   const gamedevMeta =
@@ -889,7 +889,11 @@ export function useMemos() {
         prev.map((m) => {
           if (m.id !== memoId) return m;
           const musicMeta =
-            next === "music" ? (m.musicMeta ? { ...m.musicMeta } : { ...DEFAULT_MUSIC_META }) : null;
+            next === "music"
+              ? (m.musicMeta ? { ...m.musicMeta } : { ...DEFAULT_MUSIC_META })
+              : next === "standard"
+                ? (m.musicMeta ? { ...m.musicMeta } : null)
+                : null;
           const gamedevMeta =
             next === "gamedev"
               ? (m.gamedevMeta ? { ...m.gamedevMeta } : { ...DEFAULT_GAMEDEV_META })
@@ -910,7 +914,7 @@ export function useMemos() {
       const id = activeMemoIdRef.current;
       setMemos((prev) =>
         prev.map((m) => {
-          if (m.id !== id || m.memoType !== "music" || !m.musicMeta) return m;
+          if (m.id !== id || !m.musicMeta) return m;
           const nextMeta = { ...m.musicMeta };
           if (patch.bpm !== undefined) nextMeta.bpm = clampBpm(patch.bpm);
           if (patch.key !== undefined) nextMeta.key = normalizeMusicKey(patch.key);
@@ -924,6 +928,15 @@ export function useMemos() {
     },
     [recordBeforeMutation],
   );
+
+  const initMusicModuleForMemo = useCallback((memoId: string) => {
+    setMemos((prev) =>
+      prev.map((m) => {
+        if (m.id !== memoId || m.musicMeta !== null) return m;
+        return { ...m, musicMeta: { ...DEFAULT_MUSIC_META } };
+      }),
+    );
+  }, []);
 
   const patchActiveGamedevMeta = useCallback(
     (patch: Partial<MemoGamedevMeta>) => {
@@ -1839,6 +1852,7 @@ export function useMemos() {
     switchMemo,
     addMemo,
     setMemoType,
+    initMusicModuleForMemo,
     patchActiveMusicMeta,
     patchActiveGamedevMeta,
     updateMemoTitle,

@@ -470,7 +470,7 @@ export default function NoteNode({
 
   return (
     <div
-      className={cn("w-full overflow-visible rounded-sm", isSelectionMode && "select-none")}
+      className={cn("w-full overflow-visible rounded-sm", isSelectionMode && mobileTapToggleOverlay && "select-none")}
       data-geo-block="note-node"
       data-node-id={node.id}
       onMouseEnter={() => setIsHovered(true)}
@@ -739,7 +739,7 @@ export default function NoteNode({
             ) : (
             <div
               ref={editorRef}
-              contentEditable={!isSelectionMode && !editorReadOnly}
+              contentEditable={(!isSelectionMode || !mobileTapToggleOverlay) && !editorReadOnly}
               suppressContentEditableWarning
               data-node-id={node.id}
               data-geo-editor="body"
@@ -912,7 +912,7 @@ export default function NoteNode({
         >
           <div
             ref={noteRef}
-            contentEditable={!isSelectionMode && !editorReadOnly}
+            contentEditable={(!isSelectionMode || !mobileTapToggleOverlay) && !editorReadOnly}
             suppressContentEditableWarning
             data-geo-editor="node-note"
             aria-label="ノート"
