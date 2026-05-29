@@ -3,13 +3,13 @@
 import {
   useEffect, useRef, useState, useLayoutEffect, useMemo, useCallback,
   type CSSProperties,
-  type DragEvent, type KeyboardEvent, type MouseEvent,
+  type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type TouchEvent,
 } from "react";
 import { createPortal } from "react-dom";
 import {
   FolderPlus, Pencil, Trash2, Download, Upload,
   Star, StarOff, Copy, Archive, Settings, FileText,
-  Music2, Gamepad2, Music, Smile, Share2, Users,
+  Music2, Gamepad2, Music, Smile, Share2, Users, ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/i18n/useTranslation";
@@ -367,6 +367,58 @@ function sharedMemoIconEl(size: number, solidHue?: string) {
   return <Users size={size} strokeWidth={2} {...colored} />;
 }
 
+/** Dynalist-style row menu trigger — mobile always visible; desktop on row hover. */
+function SidebarRowMenuButton({
+  item,
+  onOpenItemMenu,
+  mobileAlwaysVisible,
+}: {
+  item: FileItem;
+  onOpenItemMenu: (item: FileItem, anchor: { x: number; y: number }) => void;
+  mobileAlwaysVisible: boolean;
+}) {
+  const { t } = useTranslation();
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const openMenu = (e: MouseEvent<HTMLButtonElement> | PointerEvent<HTMLButtonElement> | TouchEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = btnRef.current?.getBoundingClientRect();
+    const x = rect?.left ?? 0;
+    const y = rect ? rect.bottom + 4 : 0;
+    onOpenItemMenu(item, { x, y });
+  };
+
+  const stopBubble = (e: MouseEvent<HTMLButtonElement> | PointerEvent<HTMLButtonElement> | TouchEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  return (
+    <button
+      ref={btnRef}
+      type="button"
+      data-sidebar-no-toggle="true"
+      aria-label={t("sidebar.rowMenu.open")}
+      aria-haspopup="menu"
+      tabIndex={-1}
+      onPointerDown={stopBubble}
+      onMouseDown={stopBubble}
+      onTouchStart={stopBubble}
+      onClick={openMenu}
+      className={cn(
+        "flex h-7 w-7 shrink-0 touch-manipulation items-center justify-center rounded-full border border-zinc-600/75 bg-zinc-900/95 text-zinc-400 shadow-sm transition-[opacity,colors] duration-150",
+        "hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-100 active:bg-zinc-700/90",
+        mobileAlwaysVisible
+          ? "opacity-100"
+          : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
+      )}
+    >
+      <ChevronDown size={14} strokeWidth={2.25} aria-hidden />
+    </button>
+  );
+}
+
 function FavoriteItemRow({
   item,
   depth,
@@ -380,6 +432,8 @@ function FavoriteItemRow({
   onRowDragEnd,
   onSelectMemo,
   onContextMenu,
+  onOpenItemMenu,
+  mobileDrawerLayout,
   localOpen,
   toggleLocal,
   currentUserId,
@@ -396,6 +450,8 @@ function FavoriteItemRow({
   onRowDragEnd: () => void;
   onSelectMemo: (id: string) => void;
   onContextMenu: (e: MouseEvent<HTMLDivElement>, item: FileItem) => void;
+  onOpenItemMenu: (item: FileItem, anchor: { x: number; y: number }) => void;
+  mobileDrawerLayout: boolean;
   localOpen: Set<string>;
   toggleLocal: (id: string) => void;
   currentUserId: string | null;
@@ -472,17 +528,20 @@ function FavoriteItemRow({
         onDragEnd={onRowDragEnd}
         className={cn(
           labelClass,
-          "group flex w-full min-w-0 items-center gap-1.5 pr-2 transition-colors active:cursor-grabbing",
+          "group flex w-full min-w-0 items-center gap-1.5 pr-1 transition-colors active:cursor-grabbing",
           SIDEBAR_ROW_CLASS,
           isFolder ? "cursor-pointer" : "cursor-grab",
           isDragging && "opacity-40",
+          mobileDrawerLayout && "[-webkit-touch-callout:none]",
         )}
         style={{ ...labelStyle, paddingLeft: `${20 + depth * 12}px` }}
         onMouseEnter={() => setRowHover(true)}
         onMouseLeave={() => setRowHover(false)}
         onClick={handleRowClick}
         onContextMenu={(e) => {
+          e.preventDefault();
           e.stopPropagation();
+          if (mobileDrawerLayout) return;
           onContextMenu(e, item);
         }}
       >
@@ -521,6 +580,12 @@ function FavoriteItemRow({
         {item.isBookmarked && depth > 0 && (
           <Star size={8} className="shrink-0 fill-amber-400/80 text-amber-400/80" />
         )}
+
+        <SidebarRowMenuButton
+          item={item}
+          onOpenItemMenu={onOpenItemMenu}
+          mobileAlwaysVisible={mobileDrawerLayout}
+        />
       </div>
 
       {isFolder && (
@@ -546,6 +611,8 @@ function FavoriteItemRow({
                 onRowDragEnd={onRowDragEnd}
                 onSelectMemo={onSelectMemo}
                 onContextMenu={onContextMenu}
+                onOpenItemMenu={onOpenItemMenu}
+                mobileDrawerLayout={mobileDrawerLayout}
                 localOpen={localOpen}
                 toggleLocal={toggleLocal}
                 currentUserId={currentUserId}
@@ -572,6 +639,8 @@ function SharedWithMeSection({
   onRowDragEnd,
   onSelectMemo,
   onContextMenu,
+  onOpenItemMenu,
+  mobileDrawerLayout,
 }: {
   fileItems: FileItem[];
   memos: Memo[];
@@ -584,6 +653,8 @@ function SharedWithMeSection({
   onRowDragEnd: () => void;
   onSelectMemo: (id: string) => void;
   onContextMenu: (e: MouseEvent<HTMLDivElement>, item: FileItem) => void;
+  onOpenItemMenu: (item: FileItem, anchor: { x: number; y: number }) => void;
+  mobileDrawerLayout: boolean;
 }) {
   const { t } = useTranslation();
   const [sectionOpen, setSectionOpen] = useState(true);
@@ -654,6 +725,8 @@ function SharedWithMeSection({
               onRowDragEnd={onRowDragEnd}
               onSelectMemo={onSelectMemo}
               onContextMenu={onContextMenu}
+              onOpenItemMenu={onOpenItemMenu}
+              mobileDrawerLayout={mobileDrawerLayout}
               localOpen={localOpen}
               toggleLocal={toggleLocal}
               currentUserId={currentUserId}
@@ -680,6 +753,8 @@ function FavoritesSection({
   onSelectMemo,
   onToggleFavorite,
   onContextMenu,
+  onOpenItemMenu,
+  mobileDrawerLayout,
 }: {
   fileItems: FileItem[];
   memos: Memo[];
@@ -693,6 +768,8 @@ function FavoritesSection({
   onSelectMemo: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onContextMenu: (e: MouseEvent<HTMLDivElement>, item: FileItem) => void;
+  onOpenItemMenu: (item: FileItem, anchor: { x: number; y: number }) => void;
+  mobileDrawerLayout: boolean;
 }) {
   const { t } = useTranslation();
   const [sectionOpen, setSectionOpen] = useState(true);
@@ -746,6 +823,8 @@ function FavoritesSection({
               onRowDragEnd={onRowDragEnd}
               onSelectMemo={onSelectMemo}
               onContextMenu={onContextMenu}
+              onOpenItemMenu={onOpenItemMenu}
+              mobileDrawerLayout={mobileDrawerLayout}
               localOpen={localOpen}
               toggleLocal={toggleLocal}
               currentUserId={currentUserId}
@@ -854,6 +933,21 @@ export function FileSidebar({
     setDeleteDialog({ item, displayName: getDisplayName(item) });
   };
 
+  const openItemContextMenuAt = useCallback(
+    (item: FileItem, anchor: { x: number; y: number }) => {
+      const menuW = 220;
+      const menuH = item.type === "folder" ? 420 : 520;
+      setContextMenu({
+        kind: "item",
+        item,
+        inviteeMenuMode: inviteeMenuModeForItem(item, memos, currentUserId),
+        x: Math.min(anchor.x, window.innerWidth - menuW - 4),
+        y: Math.min(anchor.y, window.innerHeight - menuH - 4),
+      });
+    },
+    [memos, currentUserId],
+  );
+
   const sharedTreeProps: Omit<TreeProps, "parentId" | "depth"> = {
     items: fileItems,
     memos,
@@ -902,16 +996,11 @@ export function FileSidebar({
     onContextMenu: (e, item) => {
       e.preventDefault();
       e.stopPropagation();
-      const menuW = 220;
-      const menuH = item.type === "folder" ? 420 : 520;
-      setContextMenu({
-        kind: "item",
-        item,
-        inviteeMenuMode: inviteeMenuModeForItem(item, memos, currentUserId),
-        x: Math.min(e.clientX, window.innerWidth - menuW - 4),
-        y: Math.min(e.clientY, window.innerHeight - menuH - 4),
-      });
+      if (mobileDrawerLayout) return;
+      openItemContextMenuAt(item, { x: e.clientX, y: e.clientY });
     },
+    onOpenItemMenu: openItemContextMenuAt,
+    mobileDrawerLayout: Boolean(mobileDrawerLayout),
     iconEditingId,
     onStartIconEdit: (id) => { setIconEditingId(id); setContextMenu(null); },
     onCommitIconEdit: (id, icon) => { onSetItemIcon(id, icon); setIconEditingId(null); },
@@ -935,6 +1024,7 @@ export function FileSidebar({
         className={cn("min-h-0 flex-1 overflow-y-auto overflow-x-hidden", mobileDrawerLayout && "max-md:pt-16")}
         onContextMenu={(e) => {
           e.preventDefault();
+          if (mobileDrawerLayout) return;
           const menuW = 220;
           const menuH = 240;
           setContextMenu({
@@ -969,6 +1059,8 @@ export function FileSidebar({
           onSelectMemo={onSelectMemo}
           onToggleFavorite={onToggleBookmark}
           onContextMenu={sharedTreeProps.onContextMenu}
+          onOpenItemMenu={openItemContextMenuAt}
+          mobileDrawerLayout={Boolean(mobileDrawerLayout)}
         />
 
         <SharedWithMeSection
@@ -983,6 +1075,8 @@ export function FileSidebar({
           onRowDragEnd={handleRowDragEnd}
           onSelectMemo={onSelectMemo}
           onContextMenu={sharedTreeProps.onContextMenu}
+          onOpenItemMenu={openItemContextMenuAt}
+          mobileDrawerLayout={Boolean(mobileDrawerLayout)}
         />
 
         {/* File tree */}
@@ -1331,6 +1425,8 @@ type TreeProps = {
   onDragLeaveItem: (item: FileItem) => void;
   onDropOnItem: (e: DragEvent<HTMLDivElement>, item: FileItem) => void;
   onContextMenu: (e: MouseEvent<HTMLDivElement>, item: FileItem) => void;
+  onOpenItemMenu: (item: FileItem, anchor: { x: number; y: number }) => void;
+  mobileDrawerLayout: boolean;
   iconEditingId: string | null;
   onStartIconEdit: (id: string) => void;
   onCommitIconEdit: (id: string, icon: string) => void;
@@ -1365,6 +1461,7 @@ function FileNode({
   iconEditingId, onStartIconEdit, onCommitIconEdit,
   onSelectMemo, onSelectFolder, onToggleFolder, onStartRename, onCommitRename, onDelete,
   onRowDragStart, onRowDragEnd, onDragOverItem, onDragLeaveItem, onDropOnItem, onContextMenu,
+  onOpenItemMenu, mobileDrawerLayout,
   ...rest
 }: TreeProps & { item: FileItem }) {
   const { t } = useTranslation();
@@ -1486,6 +1583,7 @@ function FileNode({
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          if (mobileDrawerLayout) return;
           onContextMenu(e, item);
         }}
         onMouseEnter={() => setRowHover(true)}
@@ -1493,10 +1591,11 @@ function FileNode({
         onClick={rowInnerClick}
         className={cn(
           labelClass,
-          "group flex w-full min-w-0 items-center gap-1 pr-1 transition-colors active:cursor-grabbing",
+          "group flex w-full min-w-0 items-center gap-1 pr-0.5 transition-colors active:cursor-grabbing",
           SIDEBAR_ROW_CLASS,
           item.type === "folder" && !isRenaming ? "cursor-pointer" : "cursor-grab",
           isDragging && "opacity-40",
+          mobileDrawerLayout && "[-webkit-touch-callout:none]",
         )}
         style={{ ...labelStyle, paddingLeft: `${indent + 8}px` }}
       >
@@ -1561,6 +1660,12 @@ function FileNode({
           <Star size={8} className="shrink-0 fill-amber-400/80 text-amber-400/80" />
         )}
 
+        <SidebarRowMenuButton
+          item={item}
+          onOpenItemMenu={onOpenItemMenu}
+          mobileAlwaysVisible={mobileDrawerLayout}
+        />
+
       </div>
 
       {indPos === "after" && (
@@ -1588,6 +1693,8 @@ function FileNode({
               onStartRename={onStartRename} onCommitRename={onCommitRename} onDelete={onDelete}
               onDragOverItem={onDragOverItem} onDragLeaveItem={onDragLeaveItem} onDropOnItem={onDropOnItem}
               onContextMenu={onContextMenu}
+              onOpenItemMenu={onOpenItemMenu}
+              mobileDrawerLayout={mobileDrawerLayout}
               newFolderParentId={rest.newFolderParentId} newFolderName={rest.newFolderName}
               newFolderInputRef={rest.newFolderInputRef}
               onNewFolderChange={rest.onNewFolderChange}

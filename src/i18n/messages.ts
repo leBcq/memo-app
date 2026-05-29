@@ -128,6 +128,7 @@ const messagesEn = {
   "sidebar.ctx.labelSection": "MEMO COLOR",
   "sidebar.ctx.share": "Share…",
   "sidebar.archiveSoon": "Archive: coming soon",
+  "sidebar.rowMenu.open": "Open item menu",
 
   "sidebar.delete.title": "Delete \"{name}\"?",
   "sidebar.delete.folderWarn":
@@ -392,6 +393,7 @@ const messagesJa: Record<MessageId, string> = {
   "sidebar.ctx.labelSection": "メモの色",
   "sidebar.ctx.share": "共有…",
   "sidebar.archiveSoon": "アーカイブは準備中です",
+  "sidebar.rowMenu.open": "メニューを開く",
 
   "sidebar.delete.title": "「{name}」を削除しますか？",
   "sidebar.delete.folderWarn":
