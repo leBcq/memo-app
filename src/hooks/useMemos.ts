@@ -1854,6 +1854,41 @@ export function useMemos() {
     [updateActiveNodes],
   );
 
+  const insertCardPropertyAt = useCallback(
+    (nodeId: string, atIndex: number) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.cardData) return n;
+            const newProp: CustomCardProperty = { id: makeId(), label: "", value: "", type: "text" };
+            const props = [...n.cardData.properties];
+            props.splice(atIndex, 0, newProp);
+            return { ...n, cardData: { ...n.cardData, properties: props } };
+          }),
+        "immediate",
+      );
+    },
+    [updateActiveNodes],
+  );
+
+  const reorderCardProperties = useCallback(
+    (nodeId: string, fromIndex: number, toIndex: number) => {
+      if (fromIndex === toIndex) return;
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.cardData) return n;
+            const props = [...n.cardData.properties];
+            const [moved] = props.splice(fromIndex, 1);
+            props.splice(toIndex, 0, moved);
+            return { ...n, cardData: { ...n.cardData, properties: props } };
+          }),
+        "immediate",
+      );
+    },
+    [updateActiveNodes],
+  );
+
   const patchNodePluginData = useCallback(
     (nodeId: string, patch: Partial<NotePluginData>, historyMode: "immediate" | "none" = "none") => {
       updateActiveNodes(
@@ -2028,6 +2063,8 @@ export function useMemos() {
     addCardToNode,
     patchCardTitle,
     addCardProperty,
+    insertCardPropertyAt,
+    reorderCardProperties,
     removeCardProperty,
     patchCardProperty,
     removeCard,

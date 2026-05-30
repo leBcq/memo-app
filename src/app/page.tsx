@@ -394,6 +394,8 @@ export default function Home() {
     addCardToNode,
     patchCardTitle,
     addCardProperty,
+    insertCardPropertyAt,
+    reorderCardProperties,
     removeCardProperty,
     patchCardProperty,
     removeCard,
@@ -1560,6 +1562,8 @@ export default function Home() {
                 onAddCard={addCardToNode}
                 onPatchCardTitle={patchCardTitle}
                 onAddCardProperty={addCardProperty}
+                onInsertCardPropertyAt={insertCardPropertyAt}
+                onReorderCardProperties={reorderCardProperties}
                 onRemoveCardProperty={removeCardProperty}
                 onPatchCardProperty={patchCardProperty}
                 onRemoveCard={removeCard}

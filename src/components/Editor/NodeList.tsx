@@ -37,6 +37,8 @@ type NodeListProps = {
   onAddCard: (id: string) => void;
   onPatchCardTitle: (id: string, title: string) => void;
   onAddCardProperty: (id: string) => void;
+  onInsertCardPropertyAt: (id: string, atIndex: number) => void;
+  onReorderCardProperties: (id: string, fromIndex: number, toIndex: number) => void;
   onRemoveCardProperty: (id: string, propId: string) => void;
   onPatchCardProperty: (id: string, propId: string, patch: Partial<Omit<CustomCardProperty, "id">>, historyMode?: "immediate" | "none") => void;
   onRemoveCard: (id: string) => void;
@@ -83,6 +85,8 @@ export default function NodeList({
   onAddCard,
   onPatchCardTitle,
   onAddCardProperty,
+  onInsertCardPropertyAt,
+  onReorderCardProperties,
   onRemoveCardProperty,
   onPatchCardProperty,
   onRemoveCard,
@@ -128,6 +132,8 @@ export default function NodeList({
           onAddCard={onAddCard}
           onPatchCardTitle={onPatchCardTitle}
           onAddCardProperty={onAddCardProperty}
+          onInsertCardPropertyAt={onInsertCardPropertyAt}
+          onReorderCardProperties={onReorderCardProperties}
           onRemoveCardProperty={onRemoveCardProperty}
           onPatchCardProperty={onPatchCardProperty}
           onRemoveCard={onRemoveCard}

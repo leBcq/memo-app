@@ -109,6 +109,8 @@ export type NoteNodeProps = {
   onAddCard?: (id: string) => void;
   onPatchCardTitle?: (id: string, title: string) => void;
   onAddCardProperty?: (id: string) => void;
+  onInsertCardPropertyAt?: (id: string, atIndex: number) => void;
+  onReorderCardProperties?: (id: string, fromIndex: number, toIndex: number) => void;
   onRemoveCardProperty?: (id: string, propId: string) => void;
   onPatchCardProperty?: (
     id: string,
@@ -226,6 +228,8 @@ export default function NoteNode({
   onAddCard,
   onPatchCardTitle,
   onAddCardProperty,
+  onInsertCardPropertyAt,
+  onReorderCardProperties,
   onRemoveCardProperty,
   onPatchCardProperty,
   onRemoveCard,
@@ -681,6 +685,8 @@ export default function NoteNode({
                   readOnly={editorReadOnly}
                   onPatchTitle={(title) => onPatchCardTitle(node.id, title)}
                   onAddProperty={() => onAddCardProperty?.(node.id)}
+                  onInsertPropertyAt={(atIndex) => onInsertCardPropertyAt?.(node.id, atIndex)}
+                  onReorderProperties={(from, to) => onReorderCardProperties?.(node.id, from, to)}
                   onRemoveProperty={(propId) => onRemoveCardProperty?.(node.id, propId)}
                   onPatchProperty={(propId, patch, mode) =>
                     onPatchCardProperty?.(node.id, propId, patch, mode)
@@ -1038,6 +1044,8 @@ export default function NoteNode({
                   onAddCard={onAddCard}
                   onPatchCardTitle={onPatchCardTitle}
                   onAddCardProperty={onAddCardProperty}
+                  onInsertCardPropertyAt={onInsertCardPropertyAt}
+                  onReorderCardProperties={onReorderCardProperties}
                   onRemoveCardProperty={onRemoveCardProperty}
                   onPatchCardProperty={onPatchCardProperty}
                   onRemoveCard={onRemoveCard}
