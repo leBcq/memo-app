@@ -170,6 +170,50 @@ const setCaretToOffset = (el: HTMLElement, offset: number) => {
   window.getSelection()?.addRange(range);
 };
 
+/** True when the Selection caret is on the first visual line of `el`. */
+function isCaretOnFirstLine(el: HTMLElement): boolean {
+  const text = el.textContent ?? "";
+  if (text === "") return true;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return true;
+  const caretRect = sel.getRangeAt(0).getBoundingClientRect();
+  if (caretRect.height === 0) return true;
+  const editorRect = el.getBoundingClientRect();
+  return caretRect.top - editorRect.top < caretRect.height * 1.5;
+}
+
+/** True when the Selection caret is on the last visual line of `el`. */
+function isCaretOnLastLine(el: HTMLElement): boolean {
+  const text = el.textContent ?? "";
+  if (text === "") return true;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return true;
+  const caretRect = sel.getRangeAt(0).getBoundingClientRect();
+  if (caretRect.height === 0) return true;
+  const editorRect = el.getBoundingClientRect();
+  return editorRect.bottom - caretRect.bottom < caretRect.height * 1.5;
+}
+
+/** Move caret to the very end of `el`. */
+function setCaretToEnd(el: HTMLElement) {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+}
+
+/** Move caret to the very start of `el`. */
+function setCaretToStart(el: HTMLElement) {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+}
+
 const insertImageAtSelection = (editor: HTMLDivElement, src: string) => {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) {
@@ -456,6 +500,44 @@ export default function NoteNode({
       onAddSibling(node.id);
       return;
     }
+
+    // Arrow navigation: jump to previous/next node when caret is at the visual boundary.
+    // Skip if any modifier that controls word/line jump is held (Ctrl on Win/Linux, Meta on Mac).
+    if (
+      (e.key === "ArrowUp" || e.key === "ArrowDown") &&
+      !e.shiftKey &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey
+    ) {
+      const el = editorRef.current;
+      if (!el) return;
+      const scope = el.closest("[data-geo-editor-root]") ?? document;
+      const all = Array.from(
+        scope.querySelectorAll<HTMLElement>('[data-geo-editor="body"]:not([contenteditable="false"])'),
+      );
+      const idx = all.indexOf(el);
+      if (idx === -1) return;
+
+      if (e.key === "ArrowUp" && isCaretOnFirstLine(el)) {
+        const prev = all[idx - 1];
+        if (prev) {
+          e.preventDefault();
+          prev.focus();
+          setCaretToEnd(prev);
+        }
+        return;
+      }
+      if (e.key === "ArrowDown" && isCaretOnLastLine(el)) {
+        const next = all[idx + 1];
+        if (next) {
+          e.preventDefault();
+          next.focus();
+          setCaretToStart(next);
+        }
+        return;
+      }
+    }
   };
 
   const openMenu = () => {
@@ -676,6 +758,16 @@ export default function NoteNode({
                   if (editorReadOnly) return;
                   e.preventDefault();
                   openMenuAtPointer(e.clientX, e.clientY);
+                }}
+                onKeyDown={(e) => {
+                  if (isComposingRef.current) return;
+                  if (editorReadOnly) return;
+                  // Enter inside a card (but NOT inside a textarea) → add sibling node
+                  if (e.key === "Enter" && !(e.target instanceof HTMLTextAreaElement)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onAddSibling(node.id);
+                  }
                 }}
               >
                 <CustomNodeCard
