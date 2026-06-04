@@ -523,8 +523,9 @@ export default function NoteNode({
         const prev = all[idx - 1];
         if (prev) {
           e.preventDefault();
+          const offset = getCaretCharOffset(el);
           prev.focus();
-          setCaretToEnd(prev);
+          setCaretToOffset(prev, offset);
         }
         return;
       }
@@ -532,8 +533,9 @@ export default function NoteNode({
         const next = all[idx + 1];
         if (next) {
           e.preventDefault();
+          const offset = getCaretCharOffset(el);
           next.focus();
-          setCaretToStart(next);
+          setCaretToOffset(next, offset);
         }
         return;
       }
