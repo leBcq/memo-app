@@ -14,6 +14,7 @@ import {
 } from "@/components/MenuColorPicker/primitives";
 import { RowTintColorPicker } from "@/components/MenuColorPicker/RowTintColorPicker";
 import { useTranslation } from "@/i18n/useTranslation";
+import { useGlossaryStore } from "@/stores/glossaryStore";
 import type { FormatCommand } from "@/hooks/useTextFormatting";
 import {
   applyFontSizeWholeBodies,
@@ -75,6 +76,8 @@ export function NodeContextMenu({
   onPatchNodeContents,
 }: Props) {
   const { t } = useTranslation();
+  const glossaryEnabled = useGlossaryStore((s) => s.enabled);
+  const toggleGlossary = useGlossaryStore((s) => s.toggle);
   const ref = useRef<HTMLDivElement>(null);
   const fgPickerRef = useRef<HTMLInputElement>(null);
   const hlPickerRef = useRef<HTMLInputElement>(null);
@@ -314,6 +317,18 @@ export function NodeContextMenu({
             {t("ctx.addCard")}
           </MenuItem>
         )}
+        {/* Glossary overlay global toggle */}
+        <div
+          className="flex cursor-pointer items-center gap-2 px-3 py-[5px] transition-colors hover:bg-zinc-900"
+          onClick={(e) => { e.stopPropagation(); toggleGlossary(); }}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleGlossary(); } }}
+          role="button"
+          tabIndex={0}
+        >
+          <span className="w-3.5 text-center text-[11px] text-zinc-500 opacity-80">📖</span>
+          <span className="flex-1 text-[11px] tracking-wide text-zinc-200">{t("ctx.glossaryToggle")}</span>
+          <ToggleSwitch on={glossaryEnabled} />
+        </div>
       </AccordionSection>
 
       {/* ── TEXT ── */}

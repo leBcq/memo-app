@@ -7,6 +7,7 @@ import { PluginNodeCard } from "@/components/Editor/PluginNodeCard";
 import { GameSpecNodeCard } from "@/components/Editor/GameSpecNodeCard";
 import { CustomNodeCard } from "@/components/Editor/CustomNodeCard";
 import { GlossaryOverlay, hasGlossaryPattern } from "@/components/Editor/GlossaryOverlay";
+import { useGlossaryStore } from "@/stores/glossaryStore";
 import {
   musicLyricNonWhitespaceCountFromElement,
   musicLyricNonWhitespaceCountFromHtml,
@@ -323,8 +324,10 @@ export default function NoteNode({
   const isPluginCard = !isCustomCard && Boolean(node.pluginData);
   const isGameSpecCard = !isCustomCard && !isPluginCard && Boolean(node.gameData);
 
+  const glossaryEnabled = useGlossaryStore((s) => s.enabled);
   const hasGlossary = useMemo(() => hasGlossaryPattern(node.content), [node.content]);
   const showGlossaryOverlay =
+    glossaryEnabled &&
     !isEditorFocused &&
     hasGlossary &&
     !isCustomCard &&

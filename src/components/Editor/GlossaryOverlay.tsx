@@ -6,9 +6,10 @@ import { cn } from "@/lib/utils";
 
 // ── Parser ─────────────────────────────────────────────────────────────────
 
-const GLOSSARY_RE = /\[\[([^\]|]+)\|([^\]]+)\]\]/g;
+// Supports half-width colon `:` (U+003A) and full-width colon `：` (U+FF1A) as separators.
+const GLOSSARY_RE = /\[\[([^\]：:]+)[：:]([^\]]+)\]\]/g;
 
-/** Returns true if html contains at least one [[word|def]] pattern. */
+/** Returns true if html contains at least one [[word:def]] or [[word：def]] pattern. */
 export function hasGlossaryPattern(html: string): boolean {
   GLOSSARY_RE.lastIndex = 0;
   return GLOSSARY_RE.test(html);
@@ -19,7 +20,7 @@ function escapeAttr(s: string): string {
 }
 
 /**
- * Replaces [[word|def]] in HTML with decorated <span> elements.
+ * Replaces [[word:def]] / [[word：def]] in HTML with decorated <span> elements.
  * The regex is safe here because [[ ]] cannot appear inside valid HTML tag syntax.
  */
 export function buildGlossaryHtml(html: string): string {

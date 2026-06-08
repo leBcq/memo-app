@@ -295,6 +295,7 @@ const messagesEn = {
   "ctx.turnPlugin": "Turn into Plugin Card",
   "ctx.turnSpec": "Turn into Spec Card",
   "ctx.addCard": "🧩 Add Card",
+  "ctx.glossaryToggle": "Glossary overlay",
 
   "ctx.focusThisNode": "Focus on this node",
   "ctx.indent": "Indent",
@@ -602,6 +603,7 @@ const messagesJa: Record<MessageId, string> = {
   "ctx.turnPlugin": "プラグインカードに変換",
   "ctx.turnSpec": "仕様カードに変換",
   "ctx.addCard": "🧩 カードを追加",
+  "ctx.glossaryToggle": "用語解説オーバーレイ",
 
   "ctx.focusThisNode": "このノードにフォーカス",
   "ctx.indent": "インデント",
