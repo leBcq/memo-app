@@ -31,3 +31,16 @@ body {
   outline: none;
   background: transparent !important;
 }
+
+/* Glossary inline term — [[word|def]] syntax */
+.geo-glossary {
+  color: rgba(34, 211, 238, 0.82);
+  text-decoration: underline dotted rgba(34, 211, 238, 0.45);
+  text-underline-offset: 3px;
+  cursor: help;
+  transition: color 0.12s ease;
+}
+.geo-glossary:hover {
+  color: rgba(34, 211, 238, 1);
+  text-decoration-color: rgba(34, 211, 238, 0.8);
+}

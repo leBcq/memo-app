@@ -6,6 +6,7 @@ import NodeContextMenu from "@/components/Editor/NodeContextMenu";
 import { PluginNodeCard } from "@/components/Editor/PluginNodeCard";
 import { GameSpecNodeCard } from "@/components/Editor/GameSpecNodeCard";
 import { CustomNodeCard } from "@/components/Editor/CustomNodeCard";
+import { GlossaryOverlay, hasGlossaryPattern } from "@/components/Editor/GlossaryOverlay";
 import {
   musicLyricNonWhitespaceCountFromElement,
   musicLyricNonWhitespaceCountFromHtml,
@@ -315,11 +316,21 @@ export default function NoteNode({
   const [imageUploading, setImageUploading] = useState(false);
   /** During IME composition, `node.content` lags; mirror count from the live editor. */
   const [musicLyricLiveCount, setMusicLyricLiveCount] = useState<number | null>(null);
+  const [isEditorFocused, setIsEditorFocused] = useState(false);
 
   const hasChildren = node.children.length > 0;
   const isCustomCard = Boolean(node.cardData);
   const isPluginCard = !isCustomCard && Boolean(node.pluginData);
   const isGameSpecCard = !isCustomCard && !isPluginCard && Boolean(node.gameData);
+
+  const hasGlossary = useMemo(() => hasGlossaryPattern(node.content), [node.content]);
+  const showGlossaryOverlay =
+    !isEditorFocused &&
+    hasGlossary &&
+    !isCustomCard &&
+    !isPluginCard &&
+    !isGameSpecCard &&
+    !(isSelectionMode && mobileTapToggleOverlay);
   const showMusicLyricCount = memoType === "music" && !isPluginCard && !isGameSpecCard;
   const musicLyricCommittedCount = useMemo(
     () => (showMusicLyricCount ? musicLyricNonWhitespaceCountFromHtml(node.content) : 0),
@@ -881,81 +892,103 @@ export default function NoteNode({
                 />
               </div>
             ) : (
-            <div
-              ref={editorRef}
-              contentEditable={(!isSelectionMode || !mobileTapToggleOverlay) && !editorReadOnly}
-              suppressContentEditableWarning
-              data-node-id={node.id}
-              data-geo-editor="body"
-              className={cn(
-                "min-h-[22px] flex-1 whitespace-pre-wrap break-words bg-transparent leading-relaxed outline-none",
-                editorBodyClassNames(node),
-                isSelectionMode && mobileTapToggleOverlay && "pointer-events-none touch-none select-none",
+            <div className="relative min-w-0 flex-1">
+              {/* Glossary overlay: shown when not editing and [[word|def]] patterns exist */}
+              {showGlossaryOverlay && (
+                <GlossaryOverlay
+                  html={node.content}
+                  className={cn(
+                    "absolute inset-0 min-h-[22px] whitespace-pre-wrap break-words bg-transparent leading-relaxed",
+                    editorBodyClassNames(node),
+                  )}
+                  style={editorBodyColorStyle(node)}
+                  onClickToEdit={() => {
+                    if (!editorReadOnly) editorRef.current?.focus();
+                  }}
+                />
               )}
-              style={editorBodyColorStyle(node)}
-              onFocus={() => onActive(node.id, editorRef.current)}
-              onCompositionStart={(e) => {
-                isComposingRef.current = true;
-                if (showMusicLyricCount) {
-                  setMusicLyricLiveCount(musicLyricNonWhitespaceCountFromElement(e.currentTarget));
-                }
-              }}
-              onCompositionUpdate={(e) => {
-                if (!showMusicLyricCount) return;
-                setMusicLyricLiveCount(musicLyricNonWhitespaceCountFromElement(e.currentTarget));
-              }}
-              onCompositionEnd={(e) => {
-                isComposingRef.current = false;
-                if (showMusicLyricCount) {
-                  setMusicLyricLiveCount(null);
-                }
-                saveCaretPosition(e.currentTarget);
-                pushContentFromEditor(e.currentTarget);
-              }}
-              onInput={(e) => {
-                if (showMusicLyricCount) {
-                  if (isComposingRef.current) {
+              <div
+                ref={editorRef}
+                contentEditable={(!isSelectionMode || !mobileTapToggleOverlay) && !editorReadOnly}
+                suppressContentEditableWarning
+                data-node-id={node.id}
+                data-geo-editor="body"
+                className={cn(
+                  "min-h-[22px] w-full whitespace-pre-wrap break-words bg-transparent leading-relaxed outline-none",
+                  editorBodyClassNames(node),
+                  isSelectionMode && mobileTapToggleOverlay && "pointer-events-none touch-none select-none",
+                )}
+                style={{
+                  ...editorBodyColorStyle(node),
+                  ...(showGlossaryOverlay
+                    ? { color: "transparent", caretColor: "transparent" }
+                    : {}),
+                }}
+                onFocus={() => { setIsEditorFocused(true); onActive(node.id, editorRef.current); }}
+                onBlur={() => setIsEditorFocused(false)}
+                onCompositionStart={(e) => {
+                  isComposingRef.current = true;
+                  if (showMusicLyricCount) {
                     setMusicLyricLiveCount(musicLyricNonWhitespaceCountFromElement(e.currentTarget));
-                  } else {
+                  }
+                }}
+                onCompositionUpdate={(e) => {
+                  if (!showMusicLyricCount) return;
+                  setMusicLyricLiveCount(musicLyricNonWhitespaceCountFromElement(e.currentTarget));
+                }}
+                onCompositionEnd={(e) => {
+                  isComposingRef.current = false;
+                  if (showMusicLyricCount) {
                     setMusicLyricLiveCount(null);
                   }
-                }
-                if (isComposingRef.current) return;
-                saveCaretPosition(e.currentTarget);
-                pushContentFromEditor(e.currentTarget);
-              }}
-              onKeyDown={handleKeyDown}
-              onClick={(e) => {
-                const target = e.target as HTMLElement;
-                if (target.tagName === "IMG") {
+                  saveCaretPosition(e.currentTarget);
+                  pushContentFromEditor(e.currentTarget);
+                }}
+                onInput={(e) => {
+                  if (showMusicLyricCount) {
+                    if (isComposingRef.current) {
+                      setMusicLyricLiveCount(musicLyricNonWhitespaceCountFromElement(e.currentTarget));
+                    } else {
+                      setMusicLyricLiveCount(null);
+                    }
+                  }
+                  if (isComposingRef.current) return;
+                  saveCaretPosition(e.currentTarget);
+                  pushContentFromEditor(e.currentTarget);
+                }}
+                onKeyDown={handleKeyDown}
+                onClick={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.tagName === "IMG") {
+                    e.preventDefault();
+                    setLightboxSrc((target as HTMLImageElement).src);
+                  }
+                }}
+                onContextMenu={(e) => {
+                  if (suppressFloatingContextMenu) {
+                    e.preventDefault();
+                    return;
+                  }
+                  if (editorReadOnly) return;
                   e.preventDefault();
-                  setLightboxSrc((target as HTMLImageElement).src);
-                }
-              }}
-              onContextMenu={(e) => {
-                if (suppressFloatingContextMenu) {
-                  e.preventDefault();
-                  return;
-                }
-                if (editorReadOnly) return;
-                e.preventDefault();
-                openMenuAtPointer(e.clientX, e.clientY);
-              }}
-              onPaste={(event) => {
-                if (editorReadOnly) return;
-                const editor = editorRef.current;
-                if (!editor) return;
+                  openMenuAtPointer(e.clientX, e.clientY);
+                }}
+                onPaste={(event) => {
+                  if (editorReadOnly) return;
+                  const editor = editorRef.current;
+                  if (!editor) return;
 
-                const items = Array.from(event.clipboardData.items);
-                const imageItem = items.find((item) => item.type.startsWith("image/"));
-                if (!imageItem) return;
+                  const items = Array.from(event.clipboardData.items);
+                  const imageItem = items.find((item) => item.type.startsWith("image/"));
+                  if (!imageItem) return;
 
-                event.preventDefault();
-                const file = imageItem.getAsFile();
-                if (!file) return;
-                void processImageFile(file);
-              }}
-            />
+                  event.preventDefault();
+                  const file = imageItem.getAsFile();
+                  if (!file) return;
+                  void processImageFile(file);
+                }}
+              />
+            </div>
             )}
             {showMusicLyricCount && musicLyricDisplayCount > 0 && (
               <span
