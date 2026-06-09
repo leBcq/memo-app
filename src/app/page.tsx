@@ -369,6 +369,7 @@ export default function Home() {
     toggleCollapsed,
     addChild,
     addSibling,
+    splitNode,
     insertSiblingWithPlainTextAfter,
     addRootNode,
     removeNode,
@@ -1537,6 +1538,7 @@ export default function Home() {
                 onToggleCollapsed={toggleCollapsed}
                 onAddChild={addChild}
                 onAddSibling={addSibling}
+                onSplitNode={splitNode}
                 onIndent={handleIndent}
                 onUnindent={handleUnindent}
                 onToggleCompleted={toggleCompleted}

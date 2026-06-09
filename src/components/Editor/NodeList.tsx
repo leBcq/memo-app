@@ -34,6 +34,7 @@ type NodeListProps = {
   onMobileSelectNode?: (id: string) => void;
   onPatchPluginData: (id: string, patch: Partial<NotePluginData>, historyMode?: "immediate" | "none") => void;
   onPatchGameData: (id: string, patch: Partial<NoteGameData>, historyMode?: "immediate" | "none") => void;
+  onSplitNode?: (id: string, beforeHtml: string, afterHtml: string) => void;
   onAddCard: (id: string) => void;
   onPatchCardTitle: (id: string, title: string) => void;
   onAddCardProperty: (id: string) => void;
@@ -82,6 +83,7 @@ export default function NodeList({
   onMobileSelectNode,
   onPatchPluginData,
   onPatchGameData,
+  onSplitNode,
   onAddCard,
   onPatchCardTitle,
   onAddCardProperty,
@@ -129,6 +131,7 @@ export default function NodeList({
           memoType={memoType}
           onPatchPluginData={onPatchPluginData}
           onPatchGameData={onPatchGameData}
+          onSplitNode={onSplitNode}
           onAddCard={onAddCard}
           onPatchCardTitle={onPatchCardTitle}
           onAddCardProperty={onAddCardProperty}

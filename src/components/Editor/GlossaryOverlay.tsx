@@ -7,12 +7,12 @@ import { cn } from "@/lib/utils";
 // ── Parser ─────────────────────────────────────────────────────────────────
 
 // Supports half-width colon `:` (U+003A) and full-width colon `：` (U+FF1A) as separators.
-const GLOSSARY_RE = /\[\[([^\]：:]+)[：:]([^\]]+)\]\]/g;
+// Also supports legacy `|` separator for backwards compatibility.
+const GLOSSARY_RE_SRC = "\\[\\[([^\\]：:|]+)[：:|]([^\\]]+)\\]\\]";
 
-/** Returns true if html contains at least one [[word:def]] or [[word：def]] pattern. */
+/** Returns true if html contains at least one [[word:def]] / [[word：def]] / [[word|def]] pattern. */
 export function hasGlossaryPattern(html: string): boolean {
-  GLOSSARY_RE.lastIndex = 0;
-  return GLOSSARY_RE.test(html);
+  return new RegExp(GLOSSARY_RE_SRC).test(html);
 }
 
 function escapeAttr(s: string): string {
@@ -20,12 +20,11 @@ function escapeAttr(s: string): string {
 }
 
 /**
- * Replaces [[word:def]] / [[word：def]] in HTML with decorated <span> elements.
- * The regex is safe here because [[ ]] cannot appear inside valid HTML tag syntax.
+ * Replaces [[word:def]] / [[word：def]] / [[word|def]] in HTML with decorated <span> elements.
+ * Creates a fresh regex instance each call to avoid shared-state lastIndex bugs.
  */
 export function buildGlossaryHtml(html: string): string {
-  GLOSSARY_RE.lastIndex = 0;
-  return html.replace(GLOSSARY_RE, (_, word: string, def: string) => {
+  return html.replace(new RegExp(GLOSSARY_RE_SRC, "g"), (_, word: string, def: string) => {
     return `<span class="geo-glossary" data-def="${escapeAttr(def.trim())}" tabindex="-1">${word.trim()}</span>`;
   });
 }

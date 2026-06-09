@@ -1413,6 +1413,26 @@ export function useMemos() {
     [updateActiveNodes, focusNodeAfterCommit],
   );
 
+  /** Split a node at cursor: current node keeps beforeHtml, new sibling gets afterHtml. */
+  const splitNode = useCallback(
+    (nodeId: string, beforeHtml: string, afterHtml: string) => {
+      const newNode = createNode({ content: afterHtml });
+      updateActiveNodes((nodes) => {
+        const update = (list: NoteNode[]): NoteNode[] => {
+          const idx = list.findIndex((n) => n.id === nodeId);
+          if (idx !== -1) {
+            const updated: NoteNode = { ...list[idx]!, content: beforeHtml };
+            return [...list.slice(0, idx), updated, newNode, ...list.slice(idx + 1)];
+          }
+          return list.map((n) => ({ ...n, children: update(n.children) }));
+        };
+        return update(nodes);
+      }, "immediate");
+      focusNodeAfterCommit(newNode.id);
+    },
+    [updateActiveNodes, focusNodeAfterCommit],
+  );
+
   /** Insert a sibling after `afterNodeId` with plain text converted to minimal HTML (lines → &lt;br&gt;). */
   const insertSiblingWithPlainTextAfter = useCallback(
     (afterNodeId: string, plainText: string) => {
@@ -2035,6 +2055,7 @@ export function useMemos() {
     toggleCollapsed,
     addChild,
     addSibling,
+    splitNode,
     insertSiblingWithPlainTextAfter,
     addRootNode,
     removeNode,

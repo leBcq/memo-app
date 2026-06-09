@@ -63,10 +63,6 @@ function noteEditorColorStyle(themeColor: string, chromeAlphaMult: number): CSSP
   };
 }
 
-type SavedSelection = {
-  node: globalThis.Node;
-  offset: number;
-};
 
 export type NoteNodeProps = {
   node: NoteNodeType;
@@ -111,6 +107,7 @@ export type NoteNodeProps = {
   onAddCard?: (id: string) => void;
   onPatchCardTitle?: (id: string, title: string) => void;
   onAddCardProperty?: (id: string) => void;
+  onSplitNode?: (id: string, beforeHtml: string, afterHtml: string) => void;
   onInsertCardPropertyAt?: (id: string, atIndex: number) => void;
   onReorderCardProperties?: (id: string, fromIndex: number, toIndex: number) => void;
   onRemoveCardProperty?: (id: string, propId: string) => void;
@@ -271,6 +268,7 @@ export default function NoteNode({
   memoType = "standard",
   onPatchPluginData,
   onPatchGameData,
+  onSplitNode,
   onAddCard,
   onPatchCardTitle,
   onAddCardProperty,
@@ -309,7 +307,7 @@ export default function NoteNode({
   const contentRowRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
   const noteComposingRef = useRef(false);
-  const savedSelectionRef = useRef<SavedSelection | null>(null);
+  const savedCaretOffsetRef = useRef<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuAnchorRect, setMenuAnchorRect] = useState<DOMRect | null>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -364,31 +362,13 @@ export default function NoteNode({
   }, [menuOpen]);
 
   const saveCaretPosition = (el: HTMLElement) => {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    if (!el.contains(range.startContainer)) return;
-
-    savedSelectionRef.current = {
-      node: range.startContainer,
-      offset: range.startOffset,
-    };
+    savedCaretOffsetRef.current = getCaretCharOffset(el);
   };
 
-  const restoreCaretPosition = () => {
-    const saved = savedSelectionRef.current;
-    if (!saved) return;
-    const sel = window.getSelection();
-    if (!sel) return;
-    try {
-      const range = document.createRange();
-      range.setStart(saved.node, saved.offset);
-      range.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } catch {
-      //
-    }
+  const restoreCaretPosition = (el: HTMLElement) => {
+    if (savedCaretOffsetRef.current === null) return;
+    setCaretToOffset(el, savedCaretOffsetRef.current);
+    savedCaretOffsetRef.current = null;
   };
 
   useEffect(() => {
@@ -400,7 +380,7 @@ export default function NoteNode({
     if (focused) {
       saveCaretPosition(el);
       el.innerHTML = node.content;
-      restoreCaretPosition();
+      restoreCaretPosition(el);
       return;
     }
 
@@ -509,9 +489,30 @@ export default function NoteNode({
       return;
     }
     if (matchesKeybind(e, KEYBINDS.ADD_SIBLING)) {
-      // Enter → add sibling node
       e.preventDefault();
-      onAddSibling(node.id);
+      const el = editorRef.current;
+      const sel = window.getSelection();
+      if (!el || !sel || sel.rangeCount === 0 || !onSplitNode) {
+        onAddSibling(node.id);
+        return;
+      }
+      const range = sel.getRangeAt(0);
+      if (!el.contains(range.commonAncestorContainer)) {
+        onAddSibling(node.id);
+        return;
+      }
+      // Delete any selected text first
+      if (!range.collapsed) range.deleteContents();
+      // Extract everything from cursor to end of node into the new sibling
+      const endRange = document.createRange();
+      endRange.selectNodeContents(el);
+      const extractRange = document.createRange();
+      extractRange.setStart(range.startContainer, range.startOffset);
+      extractRange.setEnd(endRange.endContainer, endRange.endOffset);
+      const afterFragment = extractRange.extractContents();
+      const tempDiv = document.createElement("div");
+      tempDiv.appendChild(afterFragment);
+      onSplitNode(node.id, el.innerHTML, tempDiv.innerHTML);
       return;
     }
 
@@ -901,7 +902,7 @@ export default function NoteNode({
                 <GlossaryOverlay
                   html={node.content}
                   className={cn(
-                    "absolute inset-0 min-h-[22px] whitespace-pre-wrap break-words bg-transparent leading-relaxed",
+                    "absolute inset-0 min-h-[22px] whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent leading-relaxed",
                     editorBodyClassNames(node),
                   )}
                   style={editorBodyColorStyle(node)}
@@ -917,7 +918,7 @@ export default function NoteNode({
                 data-node-id={node.id}
                 data-geo-editor="body"
                 className={cn(
-                  "min-h-[22px] w-full whitespace-pre-wrap break-words bg-transparent leading-relaxed outline-none",
+                  "min-h-[22px] w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent leading-relaxed outline-none",
                   editorBodyClassNames(node),
                   isSelectionMode && mobileTapToggleOverlay && "pointer-events-none touch-none select-none",
                 )}
@@ -1171,6 +1172,7 @@ export default function NoteNode({
                   memoType={memoType}
                   onPatchPluginData={onPatchPluginData}
                   onPatchGameData={onPatchGameData}
+                  onSplitNode={onSplitNode}
                   onAddCard={onAddCard}
                   onPatchCardTitle={onPatchCardTitle}
                   onAddCardProperty={onAddCardProperty}

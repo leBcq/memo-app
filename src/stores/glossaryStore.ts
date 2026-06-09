@@ -1,16 +1,8 @@
+"use client";
+
 import { create } from "zustand";
 
 const STORAGE_KEY = "freavia-glossary-enabled";
-
-function readEnabled(): boolean {
-  if (typeof localStorage === "undefined") return true;
-  try {
-    const v = localStorage.getItem(STORAGE_KEY);
-    return v === null ? true : v !== "false";
-  } catch {
-    return true;
-  }
-}
 
 type GlossaryStore = {
   /** Whether the [[word:def]] glossary overlay is shown in view mode. */
@@ -19,15 +11,30 @@ type GlossaryStore = {
 };
 
 export const useGlossaryStore = create<GlossaryStore>((set) => ({
-  enabled: readEnabled(),
+  enabled: true, // SSR-safe default; client hydration overwrites below
   toggle: () =>
     set((s) => {
       const next = !s.enabled;
       try {
-        localStorage.setItem(STORAGE_KEY, String(next));
+        if (typeof localStorage !== "undefined") {
+          localStorage.setItem(STORAGE_KEY, String(next));
+        }
       } catch {
         /* ignore */
       }
       return { enabled: next };
     }),
 }));
+
+// Client-side only: restore persisted value after module evaluation.
+// typeof window check ensures this block never runs during SSR.
+if (typeof window !== "undefined") {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored !== null) {
+      useGlossaryStore.setState({ enabled: stored !== "false" });
+    }
+  } catch {
+    /* ignore */
+  }
+}
