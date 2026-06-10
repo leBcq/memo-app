@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useShareModalStore } from "@/stores/shareModalStore";
 import { Share2, Paintbrush, X } from "lucide-react";
 import { useTextFormatting, type FormatCommand } from "@/hooks/useTextFormatting";
@@ -67,8 +67,6 @@ type ToolbarProps = {
   readOnly?: boolean;
 };
 
-const PRESET_COLORS = ["#a78bfa", "#60dfcd", "#f87171", "#fbbf24", "#e0e0e6"];
-
 const clampSize = (size: number) => Math.min(72, Math.max(8, size));
 
 function Separator() {
@@ -102,10 +100,7 @@ export default function Toolbar({
     [setMobileRichTextToolbarOpen],
   );
   const openShareModal = useShareModalStore((s) => s.openShareModal);
-  const colorPickerRef = useRef<HTMLInputElement>(null);
   const [fontSize, setFontSize] = useState(14);
-  const [color, setColor] = useState("#a78bfa");
-  const [hexInput, setHexInput] = useState("a78bfa");
   const {
     applyFormat,
     applyFontSize: applyExecFontSize,
@@ -164,10 +159,10 @@ export default function Toolbar({
 
   const formatBtnClass = (active: boolean) =>
     cn(
-      "h-6 min-w-6 border px-1 text-xs disabled:opacity-40",
+      "h-6 min-w-6 border px-1 text-xs font-medium disabled:opacity-40",
       active
-        ? "border-zinc-500 bg-zinc-700 text-white ring-1 ring-inset ring-zinc-500"
-        : "border-zinc-700 text-zinc-200 hover:enabled:border-zinc-500 hover:enabled:text-zinc-50",
+        ? "border-cyan-500/60 bg-zinc-700 text-white ring-1 ring-inset ring-cyan-500/40"
+        : "border-zinc-600 text-zinc-50 hover:enabled:border-zinc-400 hover:enabled:text-white",
     );
 
   const runCommand = (command: string, value?: string) => {
@@ -223,41 +218,6 @@ export default function Toolbar({
     requestAnimationFrame(refreshFormatUi);
   };
 
-  const pickColor = (nextColor: string) => {
-    setColor(nextColor);
-    setHexInput(nextColor.replace("#", ""));
-    if (batchTargetIds) {
-      applyForeColorWholeBodies(batchTargetIds, nextColor);
-      commitBatchBodies(batchTargetIds);
-      requestAnimationFrame(refreshFormatUi);
-      return;
-    }
-    const activeEditor = getActiveEditor();
-    if (!canEdit || !activeEditor) return;
-    activeEditor.focus();
-    applyFontColor(nextColor);
-    onSyncActiveEditor();
-    requestAnimationFrame(refreshFormatUi);
-  };
-
-  const handleHexInput = (val: string) => {
-    if (!/^[0-9a-fA-F]{6}$/.test(val)) return;
-    const hex = `#${val}`;
-    setColor(hex);
-    if (batchTargetIds) {
-      applyForeColorWholeBodies(batchTargetIds, hex);
-      commitBatchBodies(batchTargetIds);
-      requestAnimationFrame(refreshFormatUi);
-      return;
-    }
-    const activeEditor = getActiveEditor();
-    if (!canEdit || !activeEditor) return;
-    activeEditor.focus();
-    applyFontColor(hex);
-    onSyncActiveEditor();
-    requestAnimationFrame(refreshFormatUi);
-  };
-
   const formatMain = (
     <>
       <button
@@ -309,7 +269,7 @@ export default function Toolbar({
           onActivate: () => applyFontSize(fontSize - 1),
           disabled: !canEdit,
         })}
-        className="h-6 min-w-6 border border-zinc-700 px-1 text-xs text-zinc-200 disabled:opacity-40"
+        className="h-6 min-w-6 border border-zinc-600 px-1 text-xs text-zinc-50 disabled:opacity-40"
       >
         -
       </button>
@@ -324,7 +284,7 @@ export default function Toolbar({
           setFontSize(next);
           applyFontSize(next);
         }}
-        className="h-6 w-12 border border-zinc-700 bg-zinc-800 text-center text-xs text-zinc-200 outline-none"
+        className="h-6 w-12 border border-zinc-600 bg-zinc-800 text-center text-xs text-zinc-50 outline-none"
       />
       <button
         disabled={!canEdit}
@@ -332,73 +292,10 @@ export default function Toolbar({
           onActivate: () => applyFontSize(fontSize + 1),
           disabled: !canEdit,
         })}
-        className="h-6 min-w-6 border border-zinc-700 px-1 text-xs text-zinc-200 disabled:opacity-40"
+        className="h-6 min-w-6 border border-zinc-600 px-1 text-xs text-zinc-50 disabled:opacity-40"
       >
         +
       </button>
-
-      <Separator />
-
-      <div
-        className="relative h-6 w-6 overflow-hidden rounded border border-zinc-600"
-        style={{ background: color }}
-        title={t("toolbar.openColorPicker")}
-      >
-        <input
-          ref={colorPickerRef}
-          type="color"
-          value={color}
-          disabled={!canEdit}
-          onChange={(event) => {
-            const next = event.target.value;
-            setColor(next);
-            setHexInput(next.replace("#", ""));
-            runCommand("foreColor", next);
-          }}
-          className="absolute inset-0 cursor-pointer opacity-0"
-        />
-      </div>
-
-      <div className="flex h-6 items-center gap-1 border border-zinc-700 bg-zinc-800 px-1.5">
-        <span className="text-xs text-zinc-500">#</span>
-        <input
-          type="text"
-          maxLength={6}
-          value={hexInput}
-          readOnly={readOnly}
-          disabled={readOnly}
-          onChange={(event) => {
-            const val = event.target.value.replace(/[^0-9a-fA-F]/g, "");
-            setHexInput(val);
-            handleHexInput(val);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              handleHexInput(hexInput);
-            }
-          }}
-          className="w-14 bg-transparent font-mono text-xs text-zinc-300 outline-none"
-        />
-      </div>
-
-      {PRESET_COLORS.map((swatch) => (
-        <button
-          key={swatch}
-          disabled={!canEdit}
-          {...attachChromeProofTap({
-            disabled: !canEdit,
-            onActivate: () => {
-              if (color === swatch) {
-                colorPickerRef.current?.click();
-              } else {
-                pickColor(swatch);
-              }
-            },
-          })}
-          className={`h-3.5 w-3.5 rounded-full border transition-all hover:scale-110 disabled:opacity-40 ${color === swatch ? "border-white/60 scale-110" : "border-white/10"}`}
-          style={{ background: swatch }}
-        />
-      ))}
     </>
   );
 

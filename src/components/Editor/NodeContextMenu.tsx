@@ -340,7 +340,7 @@ export function NodeContextMenu({
               key={cmd}
               type="button"
               onClick={() => (isTextBatch ? runBatchFormat(cmd) : applyFormat(cmd))}
-              className="px-2 py-1 text-[11px] text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-zinc-50">
+              className="px-2 py-1 text-[11px] font-medium text-zinc-100 transition-colors hover:bg-zinc-900 hover:text-white">
               {cmd === "bold" ? <b>B</b> : cmd === "italic" ? <i>I</i> : cmd === "underline" ? <u>U</u> : <s>S</s>}
             </button>
           ))}
@@ -355,8 +355,8 @@ export function NodeContextMenu({
               applyFontSize(s);
             }
           }}
-            className="flex w-4 items-center justify-center text-xs text-zinc-400 hover:text-zinc-100">−</button>
-          <span className="w-5 text-center text-[10px] text-zinc-200">{fontSize}</span>
+            className="flex w-4 items-center justify-center text-xs text-zinc-200 hover:text-white">−</button>
+          <span className="w-5 text-center text-[10px] font-medium text-zinc-50">{fontSize}</span>
           <button type="button" onClick={() => {
             const s = Math.min(72, fontSize + 1);
             setFontSize(s);
@@ -367,7 +367,7 @@ export function NodeContextMenu({
               applyFontSize(s);
             }
           }}
-            className="flex w-4 items-center justify-center text-xs text-zinc-400 hover:text-zinc-100">+</button>
+            className="flex w-4 items-center justify-center text-xs text-zinc-200 hover:text-white">+</button>
         </div>
 
         {/* Row 1 — round presets (apply only, no picker) */}

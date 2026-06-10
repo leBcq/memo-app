@@ -213,7 +213,7 @@ export function MobileOutlineNodeToolsPanel({
                 e.stopPropagation();
                 runFormat(cmd);
               }}
-              className="flex h-8 min-w-[2rem] touch-manipulation items-center justify-center rounded border border-zinc-700/80 bg-zinc-900/70 px-2 text-[12px] text-zinc-200 disabled:opacity-35"
+              className="flex h-8 min-w-[2rem] touch-manipulation items-center justify-center rounded border border-zinc-600/80 bg-zinc-900/70 px-2 text-[12px] font-medium text-zinc-50 disabled:opacity-35"
             >
               {cmd === "bold" ? <b>B</b> : cmd === "italic" ? <i>I</i> : cmd === "underline" ? <u>U</u> : <s>S</s>}
             </button>
@@ -223,16 +223,16 @@ export function MobileOutlineNodeToolsPanel({
             type="button"
             disabled={disabled}
             onClick={() => applySize(Math.max(8, fontSize - 1))}
-            className="flex h-8 w-8 touch-manipulation items-center justify-center rounded border border-zinc-700/80 text-zinc-300 disabled:opacity-35"
+            className="flex h-8 w-8 touch-manipulation items-center justify-center rounded border border-zinc-600/80 text-zinc-100 disabled:opacity-35"
           >
             −
           </button>
-          <span className="min-w-[1.75rem] text-center font-mono text-[11px] text-zinc-300">{fontSize}</span>
+          <span className="min-w-[1.75rem] text-center font-mono text-[11px] font-medium text-zinc-50">{fontSize}</span>
           <button
             type="button"
             disabled={disabled}
             onClick={() => applySize(Math.min(72, fontSize + 1))}
-            className="flex h-8 w-8 touch-manipulation items-center justify-center rounded border border-zinc-700/80 text-zinc-300 disabled:opacity-35"
+            className="flex h-8 w-8 touch-manipulation items-center justify-center rounded border border-zinc-600/80 text-zinc-100 disabled:opacity-35"
           >
             +
           </button>

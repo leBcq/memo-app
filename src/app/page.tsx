@@ -1153,7 +1153,7 @@ export default function Home() {
   }, [selectedIds, displayNodes]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950 text-zinc-100">
+    <div className="group/app flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950 text-zinc-100">
       <CommandPalette
         open={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
@@ -1175,7 +1175,7 @@ export default function Home() {
       )}
       <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:28px_28px]" />
       <div className="pointer-events-none fixed -left-8 top-12 h-40 w-40 rotate-45 border border-cyan-400/30" />
-      <div className="pointer-events-none fixed bottom-10 right-12 h-48 w-48 border border-zinc-700/70" />
+      <div className="pointer-events-none fixed bottom-10 right-12 h-48 w-48 border border-zinc-700/70 opacity-[0.15] transition-opacity duration-300 group-hover/app:opacity-40" />
 
       <Toolbar
         isEditorActive={Boolean(activeId)}
@@ -1291,7 +1291,7 @@ export default function Home() {
         {/* Resize handle — desktop only */}
         <div
           className={cn(
-            "group relative z-10 hidden h-full min-h-0 w-1 shrink-0 cursor-col-resize items-center justify-center transition-all duration-300 ease-out md:flex",
+            "group relative z-0 hidden h-full min-h-0 w-1 shrink-0 cursor-col-resize items-center justify-center transition-all duration-300 ease-out md:flex",
             !isSidebarOpen && "pointer-events-none w-0 max-w-0 opacity-0",
           )}
           onMouseDown={(e) => {
@@ -1630,10 +1630,10 @@ export default function Home() {
             aria-label={t("mobile.actionsMenu.openFabAria")}
             title={t("mobile.actionsMenu.openFabAria")}
             className={cn(
-              "fixed bottom-24 right-4 z-[9999] flex h-12 w-12 touch-manipulation items-center justify-center rounded-md border shadow-[0_8px_30px_rgba(0,0,0,0.4)] md:hidden",
+              "fixed bottom-24 right-4 z-[9999] flex h-12 w-12 touch-manipulation items-center justify-center rounded-md border shadow-[0_8px_30px_rgba(0,0,0,0.4)] transition-opacity duration-200 md:hidden",
               isMobileSelectionMode || mobileOutlineSheetOpen
-                ? "border-cyan-400/55 bg-cyan-950/45 text-cyan-200 shadow-cyan-500/15"
-                : "border-zinc-600/80 bg-zinc-900/95 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200",
+                ? "border-cyan-400/55 bg-cyan-950/45 text-cyan-200 opacity-100 shadow-cyan-500/15"
+                : "border-zinc-600/80 bg-zinc-900/95 text-zinc-300 opacity-20 hover:opacity-100 hover:border-zinc-500 hover:text-zinc-100",
             )}
           >
             <MoreVertical size={22} strokeWidth={1.75} aria-hidden />
