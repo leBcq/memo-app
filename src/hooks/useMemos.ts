@@ -10,7 +10,7 @@ import {
   insertSiblingNodesAfter,
   flattenPreorderIds,
 } from "@/lib/treeUtils";
-import type { HeadingLevel, NoteNode, NotePluginData, NoteGameData, CustomCardData, CustomCardProperty } from "@/types/note";
+import type { HeadingLevel, NoteNode, NotePluginData, NoteGameData, CustomCardData, CustomCardProperty, TableColumn, TableRow } from "@/types/note";
 import {
   createNode,
   normalizeNode,
@@ -1909,6 +1909,166 @@ export function useMemos() {
     [updateActiveNodes],
   );
 
+  // ── Table CRUD ────────────────────────────────────────────────────────────────
+
+  const addTableToNode = useCallback(
+    (nodeId: string) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || n.tableData) return n;
+            return { ...n, tableData: { columns: [], rows: [] } };
+          }),
+        "immediate",
+      );
+    },
+    [updateActiveNodes],
+  );
+
+  const removeTable = useCallback(
+    (nodeId: string) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.tableData) return n;
+            return { ...n, tableData: undefined };
+          }),
+        "immediate",
+      );
+    },
+    [updateActiveNodes],
+  );
+
+  const addTableColumn = useCallback(
+    (nodeId: string) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.tableData) return n;
+            const newCol: TableColumn = { id: makeId(), label: "" };
+            const rows = n.tableData.rows.map((r) => ({
+              ...r,
+              cells: { ...r.cells, [newCol.id]: "" },
+            }));
+            return {
+              ...n,
+              tableData: { columns: [...n.tableData.columns, newCol], rows },
+            };
+          }),
+        "immediate",
+      );
+    },
+    [updateActiveNodes],
+  );
+
+  const renameTableColumn = useCallback(
+    (nodeId: string, colId: string, label: string) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.tableData) return n;
+            return {
+              ...n,
+              tableData: {
+                ...n.tableData,
+                columns: n.tableData.columns.map((c) => (c.id === colId ? { ...c, label } : c)),
+              },
+            };
+          }),
+        "none",
+      );
+    },
+    [updateActiveNodes],
+  );
+
+  const removeTableColumn = useCallback(
+    (nodeId: string, colId: string) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.tableData) return n;
+            const columns = n.tableData.columns.filter((c) => c.id !== colId);
+            const rows = n.tableData.rows.map((r) => {
+              const cells = { ...r.cells };
+              delete cells[colId];
+              return { ...r, cells };
+            });
+            return { ...n, tableData: { columns, rows } };
+          }),
+        "immediate",
+      );
+    },
+    [updateActiveNodes],
+  );
+
+  const addTableRow = useCallback(
+    (nodeId: string) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.tableData) return n;
+            const cells: Record<string, string> = {};
+            for (const col of n.tableData.columns) cells[col.id] = "";
+            const newRow: TableRow = { id: makeId(), cells };
+            return {
+              ...n,
+              tableData: { ...n.tableData, rows: [...n.tableData.rows, newRow] },
+            };
+          }),
+        "immediate",
+      );
+    },
+    [updateActiveNodes],
+  );
+
+  const removeTableRow = useCallback(
+    (nodeId: string, rowId: string) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.tableData) return n;
+            return {
+              ...n,
+              tableData: {
+                ...n.tableData,
+                rows: n.tableData.rows.filter((r) => r.id !== rowId),
+              },
+            };
+          }),
+        "immediate",
+      );
+    },
+    [updateActiveNodes],
+  );
+
+  const patchTableCell = useCallback(
+    (
+      nodeId: string,
+      rowId: string,
+      colId: string,
+      value: string,
+      historyMode: "immediate" | "none" = "none",
+    ) => {
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId || !n.tableData) return n;
+            return {
+              ...n,
+              tableData: {
+                ...n.tableData,
+                rows: n.tableData.rows.map((r) =>
+                  r.id === rowId ? { ...r, cells: { ...r.cells, [colId]: value } } : r,
+                ),
+              },
+            };
+          }),
+        historyMode,
+      );
+    },
+    [updateActiveNodes],
+  );
+
   const patchNodePluginData = useCallback(
     (nodeId: string, patch: Partial<NotePluginData>, historyMode: "immediate" | "none" = "none") => {
       updateActiveNodes(
@@ -2089,6 +2249,14 @@ export function useMemos() {
     removeCardProperty,
     patchCardProperty,
     removeCard,
+    addTableToNode,
+    removeTable,
+    addTableColumn,
+    renameTableColumn,
+    removeTableColumn,
+    addTableRow,
+    removeTableRow,
+    patchTableCell,
     setMemoWorkflowStatus,
     cloudSync: {
       phase: cloudPhase,

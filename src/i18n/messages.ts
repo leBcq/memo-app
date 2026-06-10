@@ -317,6 +317,15 @@ const messagesEn = {
   "card.removeProperty": "Remove property",
   "card.typeToggleSingle": "→ Single line",
   "card.typeToggleMulti": "→ Multi-line",
+
+  // Table attachment
+  "ctx.addTable": "📊 Add Table",
+  "table.badge": "TABLE",
+  "table.removeTable": "Remove Table",
+  "table.removeTableConfirm": "Remove this table?",
+  "table.addColumn": "+ Col",
+  "table.addRow": "+ Row",
+  "table.colPh": "Column",
 } as const;
 
 const messagesJa: Record<MessageId, string> = {
@@ -625,6 +634,15 @@ const messagesJa: Record<MessageId, string> = {
   "card.removeProperty": "項目を削除",
   "card.typeToggleSingle": "→ 1行",
   "card.typeToggleMulti": "→ 複数行",
+
+  // Table attachment
+  "ctx.addTable": "📊 表を追加",
+  "table.badge": "TABLE",
+  "table.removeTable": "表を削除",
+  "table.removeTableConfirm": "この表を削除しますか？",
+  "table.addColumn": "+ 列",
+  "table.addRow": "+ 行",
+  "table.colPh": "列名",
 };
 
 export const messages = {

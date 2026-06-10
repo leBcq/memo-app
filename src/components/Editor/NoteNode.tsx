@@ -6,6 +6,7 @@ import NodeContextMenu from "@/components/Editor/NodeContextMenu";
 import { PluginNodeCard } from "@/components/Editor/PluginNodeCard";
 import { GameSpecNodeCard } from "@/components/Editor/GameSpecNodeCard";
 import { CustomNodeCard } from "@/components/Editor/CustomNodeCard";
+import { TableNodeCard } from "@/components/Editor/TableNodeCard";
 import { GlossaryOverlay, hasGlossaryPattern } from "@/components/Editor/GlossaryOverlay";
 import { useGlossaryStore } from "@/stores/glossaryStore";
 import {
@@ -118,6 +119,15 @@ export type NoteNodeProps = {
     historyMode?: "immediate" | "none",
   ) => void;
   onRemoveCard?: (id: string) => void;
+  /** Attach a new table below this node. */
+  onAddTable?: (id: string) => void;
+  onAddTableColumn?: (id: string) => void;
+  onRenameTableColumn?: (id: string, colId: string, label: string) => void;
+  onRemoveTableColumn?: (id: string, colId: string) => void;
+  onAddTableRow?: (id: string) => void;
+  onRemoveTableRow?: (id: string, rowId: string) => void;
+  onPatchTableCell?: (id: string, rowId: string, colId: string, value: string, historyMode?: "immediate" | "none") => void;
+  onRemoveTable?: (id: string) => void;
   /** Memo theme accent for bullets, cards, mode-adjacent chrome (not body text). */
   themeColor: string;
   /** 0–1 from sidebar tint alpha; fades borders/glows while keeping hue for text. */
@@ -277,6 +287,14 @@ export default function NoteNode({
   onRemoveCardProperty,
   onPatchCardProperty,
   onRemoveCard,
+  onAddTable,
+  onAddTableColumn,
+  onRenameTableColumn,
+  onRemoveTableColumn,
+  onAddTableRow,
+  onRemoveTableRow,
+  onPatchTableCell,
+  onRemoveTable,
   themeColor,
   themeChromeAlphaMult = 1,
   onMemoColorSliderUndoGestureStart,
@@ -1078,6 +1096,11 @@ export default function NoteNode({
                 ? () => onAddCard(node.id)
                 : undefined
             }
+            onAddTable={
+              !node.tableData && !editorReadOnly && onAddTable
+                ? () => onAddTable(node.id)
+                : undefined
+            }
           />
         )}
 
@@ -1111,6 +1134,23 @@ export default function NoteNode({
               onSetNote(node.id, e.currentTarget.textContent ?? "");
             }}
             onBlur={(e) => onSetNote(node.id, e.currentTarget.textContent ?? "")}
+          />
+        </div>
+      )}
+
+      {node.tableData && (
+        <div className="px-3 pb-1" style={{ paddingLeft: "32px" }}>
+          <TableNodeCard
+            data={node.tableData}
+            accentColor={solidAccent}
+            readOnly={editorReadOnly}
+            onAddColumn={() => onAddTableColumn?.(node.id)}
+            onRenameColumn={(colId, label) => onRenameTableColumn?.(node.id, colId, label)}
+            onRemoveColumn={(colId) => onRemoveTableColumn?.(node.id, colId)}
+            onAddRow={() => onAddTableRow?.(node.id)}
+            onRemoveRow={(rowId) => onRemoveTableRow?.(node.id, rowId)}
+            onPatchCell={(rowId, colId, value, mode) => onPatchTableCell?.(node.id, rowId, colId, value, mode)}
+            onRemoveTable={() => onRemoveTable?.(node.id)}
           />
         </div>
       )}
@@ -1181,6 +1221,14 @@ export default function NoteNode({
                   onRemoveCardProperty={onRemoveCardProperty}
                   onPatchCardProperty={onPatchCardProperty}
                   onRemoveCard={onRemoveCard}
+                  onAddTable={onAddTable}
+                  onAddTableColumn={onAddTableColumn}
+                  onRenameTableColumn={onRenameTableColumn}
+                  onRemoveTableColumn={onRemoveTableColumn}
+                  onAddTableRow={onAddTableRow}
+                  onRemoveTableRow={onRemoveTableRow}
+                  onPatchTableCell={onPatchTableCell}
+                  onRemoveTable={onRemoveTable}
                   themeColor={themeColor}
                   themeChromeAlphaMult={chrome}
                   onMemoColorSliderUndoGestureStart={onMemoColorSliderUndoGestureStart}

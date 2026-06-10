@@ -43,6 +43,14 @@ type NodeListProps = {
   onRemoveCardProperty: (id: string, propId: string) => void;
   onPatchCardProperty: (id: string, propId: string, patch: Partial<Omit<CustomCardProperty, "id">>, historyMode?: "immediate" | "none") => void;
   onRemoveCard: (id: string) => void;
+  onAddTable: (id: string) => void;
+  onAddTableColumn: (id: string) => void;
+  onRenameTableColumn: (id: string, colId: string, label: string) => void;
+  onRemoveTableColumn: (id: string, colId: string) => void;
+  onAddTableRow: (id: string) => void;
+  onRemoveTableRow: (id: string, rowId: string) => void;
+  onPatchTableCell: (id: string, rowId: string, colId: string, value: string, historyMode?: "immediate" | "none") => void;
+  onRemoveTable: (id: string) => void;
   onMemoColorSliderUndoGestureStart?: () => void;
   onMemoColorSliderUndoGestureEnd?: () => void;
   onPatchNodeContents: (patches: Record<string, string>) => void;
@@ -92,6 +100,14 @@ export default function NodeList({
   onRemoveCardProperty,
   onPatchCardProperty,
   onRemoveCard,
+  onAddTable,
+  onAddTableColumn,
+  onRenameTableColumn,
+  onRemoveTableColumn,
+  onAddTableRow,
+  onRemoveTableRow,
+  onPatchTableCell,
+  onRemoveTable,
   onMemoColorSliderUndoGestureStart,
   onMemoColorSliderUndoGestureEnd,
   onPatchNodeContents,
@@ -140,6 +156,14 @@ export default function NodeList({
           onRemoveCardProperty={onRemoveCardProperty}
           onPatchCardProperty={onPatchCardProperty}
           onRemoveCard={onRemoveCard}
+          onAddTable={onAddTable}
+          onAddTableColumn={onAddTableColumn}
+          onRenameTableColumn={onRenameTableColumn}
+          onRemoveTableColumn={onRemoveTableColumn}
+          onAddTableRow={onAddTableRow}
+          onRemoveTableRow={onRemoveTableRow}
+          onPatchTableCell={onPatchTableCell}
+          onRemoveTable={onRemoveTable}
           themeColor={themeColor}
           themeChromeAlphaMult={themeChromeAlphaMult}
           onMemoColorSliderUndoGestureStart={onMemoColorSliderUndoGestureStart}

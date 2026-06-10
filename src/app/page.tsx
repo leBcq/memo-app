@@ -400,6 +400,14 @@ export default function Home() {
     removeCardProperty,
     patchCardProperty,
     removeCard,
+    addTableToNode,
+    removeTable,
+    addTableColumn,
+    renameTableColumn,
+    removeTableColumn,
+    addTableRow,
+    removeTableRow,
+    patchTableCell,
     cloudSync,
     activeMemoReadOnly,
   } = useMemos();
@@ -1569,6 +1577,14 @@ export default function Home() {
                 onRemoveCardProperty={removeCardProperty}
                 onPatchCardProperty={patchCardProperty}
                 onRemoveCard={removeCard}
+                onAddTable={addTableToNode}
+                onAddTableColumn={addTableColumn}
+                onRenameTableColumn={renameTableColumn}
+                onRemoveTableColumn={removeTableColumn}
+                onAddTableRow={addTableRow}
+                onRemoveTableRow={removeTableRow}
+                onPatchTableCell={patchTableCell}
+                onRemoveTable={removeTable}
                 suppressFloatingContextMenu={!isMdUp}
                 mobileTapToggleOverlay={!isMdUp && effectiveSelectionMode}
               />

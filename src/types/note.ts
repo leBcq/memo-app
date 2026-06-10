@@ -20,6 +20,57 @@ export interface CustomCardData {
 
 export const DEFAULT_CUSTOM_CARD: CustomCardData = { title: "", properties: [] };
 
+// ─── Table data ───────────────────────────────────────────────────────────────
+
+export interface TableColumn {
+  id: string;
+  label: string;
+}
+
+export interface TableRow {
+  id: string;
+  cells: Record<string, string>;
+}
+
+export interface TableData {
+  columns: TableColumn[];
+  rows: TableRow[];
+}
+
+export function normalizeTableData(raw: unknown): TableData {
+  if (!raw || typeof raw !== "object") return { columns: [], rows: [] };
+  const o = raw as Record<string, unknown>;
+  const columns: TableColumn[] = Array.isArray(o.columns)
+    ? o.columns.map((c) => {
+        if (!c || typeof c !== "object") return { id: String(Date.now() + Math.random()), label: "" };
+        const col = c as Record<string, unknown>;
+        return {
+          id: typeof col.id === "string" ? col.id : String(Date.now() + Math.random()),
+          label: typeof col.label === "string" ? col.label : "",
+        };
+      })
+    : [];
+  const rows: TableRow[] = Array.isArray(o.rows)
+    ? o.rows.map((r) => {
+        if (!r || typeof r !== "object") {
+          return { id: String(Date.now() + Math.random()), cells: Object.fromEntries(columns.map((c) => [c.id, ""])) };
+        }
+        const row = r as Record<string, unknown>;
+        const rawCells =
+          row.cells && typeof row.cells === "object" ? (row.cells as Record<string, unknown>) : {};
+        const cells: Record<string, string> = {};
+        for (const col of columns) {
+          cells[col.id] = typeof rawCells[col.id] === "string" ? (rawCells[col.id] as string) : "";
+        }
+        return {
+          id: typeof row.id === "string" ? row.id : String(Date.now() + Math.random()),
+          cells,
+        };
+      })
+    : [];
+  return { columns, rows };
+}
+
 export function normalizeCustomCardProperty(raw: unknown): CustomCardProperty {
   if (!raw || typeof raw !== "object") {
     return { id: String(Date.now()), label: "", value: "", type: "text" };
@@ -119,6 +170,8 @@ export interface NoteNode {
   gameData?: NoteGameData;
   /** Generic custom property card — supersedes pluginData / gameData when present. */
   cardData?: CustomCardData;
+  /** Attached spreadsheet table — rendered below the node body, independent of card/plugin/game data. */
+  tableData?: TableData;
 }
 
 const createId = () => {
@@ -141,7 +194,7 @@ export function normalizeGameData(raw: unknown): NoteGameData {
 }
 
 export function createNode(partial?: Partial<NoteNode>): NoteNode {
-  const { pluginData: pIn, gameData: gIn, cardData: cIn, id: idPartial, ...rest } = partial ?? {};
+  const { pluginData: pIn, gameData: gIn, cardData: cIn, tableData: tIn, id: idPartial, ...rest } = partial ?? {};
   let pluginData = pIn !== undefined ? normalizePluginData(pIn) : undefined;
   let gameData = gIn !== undefined ? normalizeGameData(gIn) : undefined;
   let cardData = cIn !== undefined ? normalizeCustomCardData(cIn) : undefined;
@@ -168,6 +221,7 @@ export function createNode(partial?: Partial<NoteNode>): NoteNode {
     pluginData,
     gameData,
     cardData,
+    tableData: tIn !== undefined ? normalizeTableData(tIn) : undefined,
   };
 }
 
@@ -231,6 +285,7 @@ export function cloneNoteTreeForPersistence(nodes: NoteNode[]): NoteNode[] {
     ...(n.pluginData !== undefined ? { pluginData: n.pluginData } : {}),
     ...(n.gameData !== undefined ? { gameData: n.gameData } : {}),
     ...(n.cardData !== undefined ? { cardData: n.cardData } : {}),
+    ...(n.tableData !== undefined ? { tableData: n.tableData } : {}),
   }));
 }
 
@@ -244,6 +299,10 @@ export function normalizeNode(raw: Partial<NoteNode> & { children?: unknown }): 
   const cardRaw = (raw as Partial<NoteNode>).cardData;
   const cardData =
     cardRaw !== undefined && cardRaw !== null ? normalizeCustomCardData(cardRaw) : undefined;
+
+  const tableRaw = (raw as Partial<NoteNode>).tableData;
+  const tableData =
+    tableRaw !== undefined && tableRaw !== null ? normalizeTableData(tableRaw) : undefined;
 
   const pluginRaw = (raw as Partial<NoteNode>).pluginData;
   let pluginData =
@@ -275,5 +334,6 @@ export function normalizeNode(raw: Partial<NoteNode> & { children?: unknown }): 
     pluginData,
     gameData,
     cardData,
+    tableData,
   });
 }

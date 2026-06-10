@@ -43,6 +43,8 @@ type Props = {
   memoType?: MemoType;
   /** Replace current node body with a new generic custom card. */
   onAddCard?: () => void;
+  /** Attach a spreadsheet table below this node. */
+  onAddTable?: () => void;
   onMemoColorSliderUndoGestureStart?: () => void;
   onMemoColorSliderUndoGestureEnd?: () => void;
   /** When length ≥ 2, TEXT/inline tools apply to all these bodies in one commit. */
@@ -70,6 +72,7 @@ export function NodeContextMenu({
   onSetBgColor, onSetHeading, onDelete, onFocusNode,
   memoType = "standard",
   onAddCard,
+  onAddTable,
   onMemoColorSliderUndoGestureStart,
   onMemoColorSliderUndoGestureEnd,
   textBatchTargetIds,
@@ -315,6 +318,17 @@ export function NodeContextMenu({
             }}
           >
             {t("ctx.addCard")}
+          </MenuItem>
+        )}
+        {onAddTable && (
+          <MenuItem
+            icon="📊"
+            onClick={() => {
+              onAddTable();
+              onClose();
+            }}
+          >
+            {t("ctx.addTable")}
           </MenuItem>
         )}
         {/* Glossary overlay global toggle */}
