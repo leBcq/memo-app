@@ -159,10 +159,10 @@ export default function Toolbar({
 
   const formatBtnClass = (active: boolean) =>
     cn(
-      "h-6 min-w-6 border px-1 text-xs font-medium disabled:opacity-40",
+      "h-6 min-w-6 border px-1 text-xs font-semibold disabled:opacity-40",
       active
         ? "border-cyan-500/60 bg-zinc-700 text-white ring-1 ring-inset ring-cyan-500/40"
-        : "border-zinc-600 text-zinc-50 hover:enabled:border-zinc-400 hover:enabled:text-white",
+        : "border-zinc-600 text-zinc-50 hover:enabled:border-zinc-400 hover:enabled:bg-zinc-900/80 hover:enabled:text-white",
     );
 
   const runCommand = (command: string, value?: string) => {
@@ -269,7 +269,7 @@ export default function Toolbar({
           onActivate: () => applyFontSize(fontSize - 1),
           disabled: !canEdit,
         })}
-        className="h-6 min-w-6 border border-zinc-600 px-1 text-xs text-zinc-50 disabled:opacity-40"
+        className="h-6 min-w-6 border border-zinc-600 px-1 text-xs font-semibold text-zinc-50 disabled:opacity-40"
       >
         -
       </button>
@@ -284,7 +284,7 @@ export default function Toolbar({
           setFontSize(next);
           applyFontSize(next);
         }}
-        className="h-6 w-12 border border-zinc-600 bg-zinc-800 text-center text-xs text-zinc-50 outline-none"
+        className="h-6 w-12 border border-zinc-600 bg-zinc-800 text-center text-xs font-medium text-zinc-50 outline-none"
       />
       <button
         disabled={!canEdit}
@@ -292,7 +292,7 @@ export default function Toolbar({
           onActivate: () => applyFontSize(fontSize + 1),
           disabled: !canEdit,
         })}
-        className="h-6 min-w-6 border border-zinc-600 px-1 text-xs text-zinc-50 disabled:opacity-40"
+        className="h-6 min-w-6 border border-zinc-600 px-1 text-xs font-semibold text-zinc-50 disabled:opacity-40"
       >
         +
       </button>

@@ -84,7 +84,7 @@ function Section({
   const { t } = useTranslation();
   return (
     <div className="border-b border-zinc-800/60 px-3 py-2.5">
-      <p className="mb-2 font-mono text-[9px] tracking-[2px] text-zinc-500">{t(titleId)}</p>
+      <p className="mb-2 font-mono text-[9px] font-semibold tracking-[2px] text-zinc-100">{t(titleId)}</p>
       {children}
     </div>
   );

@@ -231,7 +231,7 @@ export function NodeContextMenu({
   };
 
   const clearBtnClass =
-    "flex h-5 w-5 shrink-0 items-center justify-center border border-zinc-700/50 p-0 text-[9px] leading-none text-zinc-600 hover:border-zinc-400 hover:text-zinc-300";
+    "flex h-5 w-5 shrink-0 items-center justify-center border border-zinc-600/70 p-0 text-[9px] leading-none text-zinc-200 hover:border-zinc-400 hover:text-zinc-50";
 
   return (
     <div
@@ -340,7 +340,7 @@ export function NodeContextMenu({
               key={cmd}
               type="button"
               onClick={() => (isTextBatch ? runBatchFormat(cmd) : applyFormat(cmd))}
-              className="px-2 py-1 text-[11px] font-medium text-zinc-100 transition-colors hover:bg-zinc-900 hover:text-white">
+              className="flex h-6 min-w-6 items-center justify-center border border-zinc-600/80 px-1.5 text-[11px] font-semibold text-zinc-50 transition-colors hover:border-zinc-400 hover:bg-zinc-900 hover:text-white">
               {cmd === "bold" ? <b>B</b> : cmd === "italic" ? <i>I</i> : cmd === "underline" ? <u>U</u> : <s>S</s>}
             </button>
           ))}
@@ -417,7 +417,7 @@ export function NodeContextMenu({
 
         {/* ── HIGHLIGHT ── */}
         <div className="px-3 pb-2">
-          <div className="mb-1.5 text-[9px] tracking-[2px] text-zinc-600">HIGHLIGHT</div>
+          <div className="mb-1.5 text-[9px] font-semibold tracking-[2px] text-zinc-200">HIGHLIGHT</div>
 
           {/* Row 1 — round presets (apply only) + clear */}
           <div className="flex items-center gap-2 pb-1.5">
@@ -533,17 +533,17 @@ function AccordionSection({
         className={cn(
           "flex w-full items-center gap-2 px-3 py-1.5 transition-all duration-150",
           open
-            ? "border-l-2 border-cyan-500/50 bg-cyan-950/15 [box-shadow:inset_2px_0_8px_rgba(6,182,212,0.06)]"
-            : "border-l-2 border-transparent hover:border-zinc-700/60 hover:bg-zinc-900/50",
+            ? "border-l-2 border-cyan-500/60 bg-cyan-950/20 [box-shadow:inset_2px_0_8px_rgba(6,182,212,0.08)]"
+            : "border-l-2 border-transparent hover:border-zinc-600/70 hover:bg-zinc-900/55",
         )}>
-        <svg className={cn("h-[7px] w-[7px] shrink-0 transition-all duration-150", open ? "rotate-90 text-cyan-400/80" : "text-zinc-600")}
+        <svg className={cn("h-[7px] w-[7px] shrink-0 transition-all duration-150", open ? "rotate-90 text-cyan-300" : "text-zinc-200")}
           viewBox="0 0 8 8" fill="currentColor">
           <polygon points="1,1 7,4 1,7" />
         </svg>
-        <span className={cn("text-[9px] tracking-[2px] transition-colors duration-150", open ? "text-cyan-400/80" : "text-zinc-600")}>
+        <span className={cn("text-[9px] font-semibold tracking-[2px] transition-colors duration-150", open ? "text-cyan-300" : "text-zinc-100")}>
           {label}
         </span>
-        <div className={cn("h-px flex-1 transition-colors duration-150", open ? "bg-cyan-500/20" : "bg-zinc-800/50")} />
+        <div className={cn("h-px flex-1 transition-colors duration-150", open ? "bg-cyan-500/30" : "bg-zinc-700/60")} />
       </button>
       <div className={cn("grid transition-[grid-template-rows] duration-200 ease-out", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
         <div className="overflow-hidden">{children}</div>
