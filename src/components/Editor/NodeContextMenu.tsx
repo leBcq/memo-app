@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { NoteNode } from "@/types/note";
+import type { NoteNode, ResetInterval } from "@/types/note";
 import type { MemoType } from "@/types/memoKind";
 import { cn } from "@/lib/utils";
 import { useTextFormatting } from "@/hooks/useTextFormatting";
@@ -45,6 +45,10 @@ type Props = {
   onAddCard?: () => void;
   /** Attach a spreadsheet table below this node. */
   onAddTable?: () => void;
+  onSetResetInterval?: (interval: ResetInterval) => void;
+  onCopyNode?: () => void;
+  onCutNode?: () => void;
+  onPasteNode?: () => void;
   onMemoColorSliderUndoGestureStart?: () => void;
   onMemoColorSliderUndoGestureEnd?: () => void;
   /** When length ≥ 2, TEXT/inline tools apply to all these bodies in one commit. */
@@ -73,6 +77,10 @@ export function NodeContextMenu({
   memoType = "standard",
   onAddCard,
   onAddTable,
+  onSetResetInterval,
+  onCopyNode,
+  onCutNode,
+  onPasteNode,
   onMemoColorSliderUndoGestureStart,
   onMemoColorSliderUndoGestureEnd,
   textBatchTargetIds,
@@ -276,6 +284,34 @@ export function NodeContextMenu({
         <MenuItem icon={node.collapsed ? "▸" : "▾"} active={node.collapsed} onClick={onToggleCollapsed}>
           {node.collapsed ? t("ctx.expand") : t("ctx.collapse")}
         </MenuItem>
+        {(onCopyNode || onCutNode || onPasteNode) && (
+          <div className="flex gap-0 border-t border-zinc-800/50 px-3 py-1">
+            {onCopyNode && (
+              <button type="button"
+                onClick={() => { onCopyNode(); onClose(); }}
+                className="flex flex-1 items-center justify-center gap-1 py-[3px] text-[10px] tracking-wide text-zinc-300 hover:text-zinc-50"
+                title={`${t("ctx.copy")} (Ctrl+C)`}>
+                <span className="text-[11px]">📋</span> {t("ctx.copy")}
+              </button>
+            )}
+            {onCutNode && (
+              <button type="button"
+                onClick={() => { onCutNode(); onClose(); }}
+                className="flex flex-1 items-center justify-center gap-1 py-[3px] text-[10px] tracking-wide text-zinc-300 hover:text-zinc-50"
+                title={`${t("ctx.cut")} (Ctrl+X)`}>
+                <span className="text-[11px]">✂️</span> {t("ctx.cut")}
+              </button>
+            )}
+            {onPasteNode && (
+              <button type="button"
+                onClick={() => { onPasteNode(); onClose(); }}
+                className="flex flex-1 items-center justify-center gap-1 py-[3px] text-[10px] tracking-wide text-zinc-300 hover:text-zinc-50"
+                title={`${t("ctx.paste")} (Ctrl+V)`}>
+                <span className="text-[11px]">📥</span> {t("ctx.paste")}
+              </button>
+            )}
+          </div>
+        )}
       </AccordionSection>
 
       {/* ── TASK ── */}
@@ -294,6 +330,26 @@ export function NodeContextMenu({
           onClick={() => { if (node.hasCheckbox) onToggleCompleted(); }}>
           {node.completed ? t("ctx.uncomplete") : t("ctx.complete")}
         </MenuItem>
+        {node.hasCheckbox && onSetResetInterval && (
+          <div className="flex items-center gap-2 px-3 py-[5px]">
+            <span className="w-3.5 text-center text-[11px] text-zinc-500 opacity-80">🔄</span>
+            <span className="flex-1 text-[11px] tracking-wide text-zinc-200">{t("ctx.autoReset")}</span>
+            <div className="flex gap-0.5">
+              {(["none", "1hour", "1day"] as const).map((interval) => (
+                <button key={interval} type="button"
+                  onClick={() => onSetResetInterval(interval)}
+                  className={cn(
+                    "border px-1.5 py-px text-[9px] tracking-wider transition-colors",
+                    (node.resetInterval ?? "none") === interval
+                      ? "border-cyan-700 bg-cyan-950/30 text-cyan-300"
+                      : "border-zinc-700 text-zinc-500 hover:border-zinc-500 hover:text-zinc-300",
+                  )}>
+                  {interval === "none" ? t("ctx.autoResetOff") : interval === "1hour" ? t("ctx.autoReset1h") : t("ctx.autoReset1d")}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </AccordionSection>
 
       {/* ── NODE ── */}

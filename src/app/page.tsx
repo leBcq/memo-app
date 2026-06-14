@@ -81,24 +81,40 @@ function htmlToPlainText(html: string): string {
   return el.textContent ?? "";
 }
 
-/** Collect text from selected nodes preserving indent depth. */
-function collectSelectedText(nodes: NoteNode[], selected: Set<string>, depth = 0): string {
-  const lines: string[] = [];
-  for (const node of nodes) {
-    if (selected.has(node.id)) {
-      const line = node.cardData
-        ? [node.cardData.title, ...node.cardData.properties.map((p) => `${p.label}: ${p.value}`)].filter(Boolean).join(" · ")
-        : node.pluginData
-          ? [node.pluginData.name, node.pluginData.category, node.pluginData.purpose].filter(Boolean).join(" · ")
-          : node.gameData
-            ? [node.gameData.name, node.gameData.category, node.gameData.stats].filter(Boolean).join(" · ")
-            : htmlToPlainText(node.content);
-      lines.push("\t".repeat(depth) + line);
-    }
-    const childLines = collectSelectedText(node.children, selected, depth + 1);
-    if (childLines) lines.push(childLines);
+/** Extract plain text from a single node (strips HTML, trims). */
+function extractNodePlainText(node: NoteNode): string {
+  if (node.cardData) {
+    return [node.cardData.title, ...node.cardData.properties.map((p) => `${p.label}: ${p.value}`)].filter(Boolean).join(" · ");
   }
-  return lines.join("\n");
+  if (node.pluginData) {
+    return [node.pluginData.name, node.pluginData.category, node.pluginData.purpose].filter(Boolean).join(" · ");
+  }
+  if (node.gameData) {
+    return [node.gameData.name, node.gameData.category, node.gameData.stats].filter(Boolean).join(" · ");
+  }
+  return htmlToPlainText(node.content).trim();
+}
+
+/** Collect (depth, text) pairs for all selected nodes, preserving tree depth. */
+function collectSelectedEntries(
+  nodes: NoteNode[],
+  selected: Set<string>,
+  depth = 0,
+): Array<[number, string]> {
+  const result: Array<[number, string]> = [];
+  for (const node of nodes) {
+    if (selected.has(node.id)) result.push([depth, extractNodePlainText(node)]);
+    result.push(...collectSelectedEntries(node.children, selected, depth + 1));
+  }
+  return result;
+}
+
+/** Collect text from selected nodes, normalising depth so minimum depth = 0 (no leading tabs). */
+function collectSelectedText(nodes: NoteNode[], selected: Set<string>): string {
+  const entries = collectSelectedEntries(nodes, selected);
+  if (entries.length === 0) return "";
+  const minDepth = Math.min(...entries.map(([d]) => d));
+  return entries.map(([d, text]) => "\t".repeat(d - minDepth) + text).join("\n");
 }
 
 /** IDs in `selected` that are not descendants of another selected node (for safe bulk delete). */
@@ -408,11 +424,40 @@ export default function Home() {
     addTableRow,
     removeTableRow,
     patchTableCell,
+    setResetInterval,
+    storeSelectedToClipboard,
+    deleteSelectedNodes,
+    pasteNodesAfter,
     cloudSync,
     activeMemoReadOnly,
   } = useMemos();
 
   const { user } = useAuth();
+
+  const handleContextMenuCopy = useCallback(
+    (nodeId: string) => {
+      const ids = selectedIds.includes(nodeId) && selectedIds.length > 0 ? selectedIds : [nodeId];
+      storeSelectedToClipboard(ids);
+    },
+    [selectedIds, storeSelectedToClipboard],
+  );
+
+  const handleContextMenuCut = useCallback(
+    (nodeId: string) => {
+      const ids = selectedIds.includes(nodeId) && selectedIds.length > 0 ? selectedIds : [nodeId];
+      storeSelectedToClipboard(ids);
+      deleteSelectedNodes(ids);
+      setSelectedIds([]);
+    },
+    [selectedIds, storeSelectedToClipboard, deleteSelectedNodes],
+  );
+
+  const handleContextMenuPaste = useCallback(
+    (nodeId: string) => {
+      pasteNodesAfter(nodeId);
+    },
+    [pasteNodesAfter],
+  );
 
   const handleSetBgColor = useCallback(
     (id: string, color: string | null, opts?: { skipHistory?: boolean }) => {
@@ -869,16 +914,16 @@ export default function Home() {
   );
 
   const mobileActionsCopy = useCallback(async () => {
+    storeSelectedToClipboard(selectedIds);
     const text = collectSelectedText(displayNodes, new Set(selectedIds));
     try {
       await navigator.clipboard.writeText(text);
-    } catch {
-      window.alert(t("mobile.actionsMenu.clipboardDenied"));
-    }
+    } catch { /* clipboard permission may be denied — internal clipboard still stored */ }
     setMobileOutlineSheetOpen(false);
-  }, [selectedIds, displayNodes, t]);
+  }, [selectedIds, displayNodes, storeSelectedToClipboard, t]);
 
   const mobileActionsCut = useCallback(async () => {
+    storeSelectedToClipboard(selectedIds);
     const text = collectSelectedText(displayNodes, new Set(selectedIds));
     try {
       await navigator.clipboard.writeText(text);
@@ -886,25 +931,25 @@ export default function Home() {
       window.alert(t("mobile.actionsMenu.clipboardDenied"));
       return;
     }
-    const roots = selectionRootIdsAmong(displayNodes, new Set(selectedIds));
-    const order = getDomOrderedNodeIds();
-    roots.sort((a, b) => order.indexOf(b) - order.indexOf(a));
-    for (const id of roots) removeNode(id);
+    deleteSelectedNodes(selectedIds);
     setSelectedIds([]);
     setMobileOutlineSheetOpen(false);
-  }, [selectedIds, displayNodes, removeNode, t]);
+  }, [selectedIds, displayNodes, storeSelectedToClipboard, deleteSelectedNodes, t]);
 
   const mobileActionsPaste = useCallback(async () => {
     const anchor = mobileOutlineActionsAnchorId;
     if (!anchor) return;
-    try {
-      const text = await navigator.clipboard.readText();
-      insertSiblingWithPlainTextAfter(anchor, text);
-    } catch {
-      window.alert(t("mobile.actionsMenu.clipboardDenied"));
+    const pasted = pasteNodesAfter(anchor);
+    if (!pasted) {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text.trim()) insertSiblingWithPlainTextAfter(anchor, text);
+      } catch {
+        window.alert(t("mobile.actionsMenu.clipboardDenied"));
+      }
     }
     setMobileOutlineSheetOpen(false);
-  }, [mobileOutlineActionsAnchorId, insertSiblingWithPlainTextAfter, t]);
+  }, [mobileOutlineActionsAnchorId, pasteNodesAfter, insertSiblingWithPlainTextAfter, t]);
 
   const mobileActionsFocusTarget = useCallback(() => {
     const id = mobileOutlineActionsAnchorId;
@@ -1138,27 +1183,44 @@ export default function Home() {
     };
   }, [settings.selectionModeModifier]);
 
-  // ── Copy: hijack when block selection is active (capture phase) ────────────
+  // ── Copy / Cut: hijack when block selection is active (capture phase) ───────
   useEffect(() => {
+    const isNativeTextSelection = () => {
+      const active = document.activeElement as HTMLElement | null;
+      if (!active?.isContentEditable) return false;
+      const sel = window.getSelection();
+      return !!(sel && !sel.isCollapsed && sel.anchorNode && active.contains(sel.anchorNode));
+    };
+
     const onCopy = (e: ClipboardEvent) => {
       if (selectedIds.length === 0) return;
-
-      const active = document.activeElement as HTMLElement | null;
-      if (active?.isContentEditable) {
-        const sel = window.getSelection();
-        if (sel && !sel.isCollapsed && sel.anchorNode && active.contains(sel.anchorNode)) {
-          return;
-        }
-      }
-
+      if (isNativeTextSelection()) return;
       e.preventDefault();
       e.stopPropagation();
+      storeSelectedToClipboard(selectedIds);
       const text = collectSelectedText(displayNodes, new Set(selectedIds));
       e.clipboardData?.setData("text/plain", text);
     };
+
+    const onCut = (e: ClipboardEvent) => {
+      if (selectedIds.length === 0) return;
+      if (isNativeTextSelection()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      storeSelectedToClipboard(selectedIds);
+      const text = collectSelectedText(displayNodes, new Set(selectedIds));
+      e.clipboardData?.setData("text/plain", text);
+      deleteSelectedNodes(selectedIds);
+      setSelectedIds([]);
+    };
+
     document.addEventListener("copy", onCopy, true);
-    return () => document.removeEventListener("copy", onCopy, true);
-  }, [selectedIds, displayNodes]);
+    document.addEventListener("cut", onCut, true);
+    return () => {
+      document.removeEventListener("copy", onCopy, true);
+      document.removeEventListener("cut", onCut, true);
+    };
+  }, [selectedIds, displayNodes, storeSelectedToClipboard, deleteSelectedNodes]);
 
   return (
     <div className="group/app flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950 text-zinc-100">
@@ -1585,6 +1647,10 @@ export default function Home() {
                 onRemoveTableRow={removeTableRow}
                 onPatchTableCell={patchTableCell}
                 onRemoveTable={removeTable}
+                onSetResetInterval={setResetInterval}
+                onCopyNode={handleContextMenuCopy}
+                onCutNode={handleContextMenuCut}
+                onPasteNode={handleContextMenuPaste}
                 suppressFloatingContextMenu={!isMdUp}
                 mobileTapToggleOverlay={!isMdUp && effectiveSelectionMode}
               />

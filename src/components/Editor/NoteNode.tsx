@@ -26,7 +26,7 @@ import {
   isThemeChromeInvisible,
 } from "@/lib/memoThemeColor";
 import type { MemoType } from "@/types/memoKind";
-import type { NoteNode as NoteNodeType, NotePluginData, NoteGameData, CustomCardProperty } from "@/types/note";
+import type { NoteNode as NoteNodeType, NotePluginData, NoteGameData, CustomCardProperty, ResetInterval } from "@/types/note";
 import { useSettings } from "@/contexts/SettingsContext";
 import { isSelectionModifierHeld } from "@/lib/selectionModeModifier";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
@@ -128,6 +128,10 @@ export type NoteNodeProps = {
   onRemoveTableRow?: (id: string, rowId: string) => void;
   onPatchTableCell?: (id: string, rowId: string, colId: string, value: string, historyMode?: "immediate" | "none") => void;
   onRemoveTable?: (id: string) => void;
+  onSetResetInterval?: (id: string, interval: ResetInterval) => void;
+  onCopyNode?: (id: string) => void;
+  onCutNode?: (id: string) => void;
+  onPasteNode?: (id: string) => void;
   /** Memo theme accent for bullets, cards, mode-adjacent chrome (not body text). */
   themeColor: string;
   /** 0–1 from sidebar tint alpha; fades borders/glows while keeping hue for text. */
@@ -295,6 +299,10 @@ export default function NoteNode({
   onRemoveTableRow,
   onPatchTableCell,
   onRemoveTable,
+  onSetResetInterval,
+  onCopyNode,
+  onCutNode,
+  onPasteNode,
   themeColor,
   themeChromeAlphaMult = 1,
   onMemoColorSliderUndoGestureStart,
@@ -759,26 +767,37 @@ export default function NoteNode({
             )}
 
             {node.hasCheckbox && (
-              <button
-                type="button"
-                onClick={() => onToggleCompleted(node.id)}
-                className={cn(
-                  "mt-1.5 mr-0.5 flex h-3 w-3 shrink-0 items-center justify-center border transition-colors",
-                )}
-                style={{
-                  borderColor: solidAccent,
-                }}
-                aria-label={node.completed ? "完了を解除" : "完了にする"}
-              >
-                {node.completed && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onToggleCompleted(node.id)}
+                  className={cn(
+                    "mt-1.5 mr-0.5 flex h-3 w-3 shrink-0 items-center justify-center border transition-colors",
+                  )}
+                  style={{
+                    borderColor: solidAccent,
+                  }}
+                  aria-label={node.completed ? "完了を解除" : "完了にする"}
+                >
+                  {node.completed && (
+                    <span
+                      className="text-[8px] leading-none"
+                      style={{ color: solidAccent }}
+                    >
+                      ✓
+                    </span>
+                  )}
+                </button>
+                {node.resetInterval && node.resetInterval !== "none" && (
                   <span
-                    className="text-[8px] leading-none"
-                    style={{ color: solidAccent }}
+                    className="mt-1.5 shrink-0 self-start text-[9px] leading-none text-zinc-600"
+                    title={node.resetInterval === "1hour" ? "1時間でリセット" : "24時間でリセット"}
+                    aria-hidden
                   >
-                    ✓
+                    🔄
                   </span>
                 )}
-              </button>
+              </>
             )}
 
             {isCustomCard && node.cardData && onPatchCardTitle ? (
@@ -1101,6 +1120,14 @@ export default function NoteNode({
                 ? () => onAddTable(node.id)
                 : undefined
             }
+            onSetResetInterval={
+              !editorReadOnly && onSetResetInterval
+                ? (interval) => onSetResetInterval(node.id, interval)
+                : undefined
+            }
+            onCopyNode={onCopyNode ? () => onCopyNode(node.id) : undefined}
+            onCutNode={!editorReadOnly && onCutNode ? () => onCutNode(node.id) : undefined}
+            onPasteNode={!editorReadOnly && onPasteNode ? () => onPasteNode(node.id) : undefined}
           />
         )}
 
@@ -1229,6 +1256,10 @@ export default function NoteNode({
                   onRemoveTableRow={onRemoveTableRow}
                   onPatchTableCell={onPatchTableCell}
                   onRemoveTable={onRemoveTable}
+                  onSetResetInterval={onSetResetInterval}
+                  onCopyNode={onCopyNode}
+                  onCutNode={onCutNode}
+                  onPasteNode={onPasteNode}
                   themeColor={themeColor}
                   themeChromeAlphaMult={chrome}
                   onMemoColorSliderUndoGestureStart={onMemoColorSliderUndoGestureStart}

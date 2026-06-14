@@ -10,7 +10,7 @@ import {
   insertSiblingNodesAfter,
   flattenPreorderIds,
 } from "@/lib/treeUtils";
-import type { HeadingLevel, NoteNode, NotePluginData, NoteGameData, CustomCardData, CustomCardProperty, TableColumn, TableRow } from "@/types/note";
+import type { HeadingLevel, NoteNode, NotePluginData, NoteGameData, CustomCardData, CustomCardProperty, TableColumn, TableRow, ResetInterval } from "@/types/note";
 import {
   createNode,
   normalizeNode,
@@ -77,6 +77,33 @@ import {
 import { fetchInviteeShareRolesByMemoId } from "@/lib/supabaseShares";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+
+// ── Internal node clipboard (structural copy-paste, survives text paste) ─────
+let _nodeClipboard: NoteNode[] | null = null;
+
+/** Roots of a selection: nodes whose ancestors are not also in the selection. */
+function collectSelectionRoots(nodes: NoteNode[], selected: Set<string>): NoteNode[] {
+  const result: NoteNode[] = [];
+  const walk = (list: NoteNode[], parentInSelection: boolean) => {
+    for (const node of list) {
+      const inSel = selected.has(node.id);
+      if (inSel && !parentInSelection) result.push(node);
+      walk(node.children, parentInSelection || inSel);
+    }
+  };
+  walk(nodes, false);
+  return result;
+}
+
+/** Deep-clone a node subtree with fresh IDs (for structural paste). */
+function cloneTreeWithFreshIds(nodes: NoteNode[]): NoteNode[] {
+  return nodes.map((n) => ({
+    ...n,
+    id: makeId(),
+    checkedAt: null,
+    children: cloneTreeWithFreshIds(n.children),
+  }));
+}
 
 const MEMO_KEY = "geo-memo-memos-v1";
 const FS_KEY = "geo-memo-fs-v1";
@@ -1438,6 +1465,7 @@ export function useMemos() {
     (afterNodeId: string, plainText: string) => {
       const escapedLines = plainText.split(/\n/).map((line) =>
         line
+          .trimStart()
           .replace(/&/g, "&amp;")
           .replace(/</g, "&lt;")
           .replace(/>/g, "&gt;")
@@ -1541,10 +1569,117 @@ export function useMemos() {
   const toggleCompleted = useCallback(
     (nodeId: string) =>
       updateActiveNodes(
-        (nodes) => mapTree(nodes, (n) => (n.id === nodeId ? { ...n, completed: !n.completed } : n)),
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId) return n;
+            const nextCompleted = !n.completed;
+            return {
+              ...n,
+              completed: nextCompleted,
+              checkedAt: nextCompleted ? new Date().toISOString() : null,
+            };
+          }),
         "immediate",
       ),
     [updateActiveNodes],
+  );
+
+  const setResetInterval = useCallback(
+    (nodeId: string, interval: ResetInterval) =>
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) => {
+            if (n.id !== nodeId) return n;
+            return { ...n, resetInterval: interval === "none" ? undefined : interval };
+          }),
+        "immediate",
+      ),
+    [updateActiveNodes],
+  );
+
+  const resetExpiredTasks = useCallback(() => {
+    const now = Date.now();
+    setMemos((prev) => {
+      let anyChanged = false;
+      const next = prev.map((memo) => {
+        let memoChanged = false;
+        const newNodes = mapTree(memo.nodes, (n) => {
+          if (!n.completed || !n.resetInterval || n.resetInterval === "none" || !n.checkedAt)
+            return n;
+          const checkedTime = new Date(n.checkedAt).getTime();
+          const intervalMs =
+            n.resetInterval === "1hour" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+          if (now - checkedTime >= intervalMs) {
+            memoChanged = true;
+            anyChanged = true;
+            return { ...n, completed: false, checkedAt: null };
+          }
+          return n;
+        });
+        if (memoChanged) return { ...memo, nodes: newNodes, updatedAt: new Date().toISOString() };
+        return memo;
+      });
+      return anyChanged ? next : prev;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    resetExpiredTasks();
+    const id = setInterval(resetExpiredTasks, 60 * 1000);
+    return () => clearInterval(id);
+  }, [isHydrated, resetExpiredTasks]);
+
+  // ── Internal clipboard: structural copy/cut/paste ────────────────────────
+  const storeSelectedToClipboard = useCallback((nodeIds: string[]) => {
+    const memo = memosRef.current.find((m) => m.id === activeMemoIdRef.current);
+    if (!memo || nodeIds.length === 0) return;
+    const idSet = new Set(nodeIds);
+    const roots = collectSelectionRoots(memo.nodes, idSet);
+    _nodeClipboard = roots.length > 0 ? roots : null;
+  }, []);
+
+  const deleteSelectedNodes = useCallback(
+    (nodeIds: string[]) => {
+      const memo = memosRef.current.find((m) => m.id === activeMemoIdRef.current);
+      if (!memo || nodeIds.length === 0) return;
+      const idSet = new Set(nodeIds);
+      const roots = collectSelectionRoots(memo.nodes, idSet);
+      if (roots.length === 0) return;
+      const rootIds = new Set(roots.map((n) => n.id));
+      recordBeforeMutation();
+      setMemos((prev) =>
+        prev.map((m) => {
+          if (m.id !== activeMemoIdRef.current) return m;
+          const remove = (list: NoteNode[]): NoteNode[] =>
+            list
+              .filter((n) => !rootIds.has(n.id))
+              .map((n) => ({ ...n, children: remove(n.children) }));
+          const newNodes = remove(m.nodes);
+          return {
+            ...m,
+            nodes: newNodes.length > 0 ? newNodes : [createNode()],
+            updatedAt: new Date().toISOString(),
+          };
+        }),
+      );
+    },
+    [recordBeforeMutation],
+  );
+
+  const pasteNodesAfter = useCallback(
+    (afterNodeId: string | null): boolean => {
+      if (!_nodeClipboard || _nodeClipboard.length === 0) return false;
+      const cloned = cloneTreeWithFreshIds(_nodeClipboard);
+      updateActiveNodes(
+        (nodes) => insertSiblingNodesAfter(nodes, afterNodeId, cloned),
+        "immediate",
+      );
+      const firstId = cloned[0]?.id;
+      if (firstId) focusNodeAfterCommit(firstId);
+      return true;
+    },
+    [updateActiveNodes, focusNodeAfterCommit],
   );
 
   const toggleHasCheckbox = useCallback(
@@ -2225,6 +2360,7 @@ export function useMemos() {
     handleBulkIndent,
     handleBulkUnindent,
     toggleCompleted,
+    setResetInterval,
     toggleHasCheckbox,
     setNote,
     toggleNote,
@@ -2257,6 +2393,9 @@ export function useMemos() {
     addTableRow,
     removeTableRow,
     patchTableCell,
+    storeSelectedToClipboard,
+    deleteSelectedNodes,
+    pasteNodesAfter,
     setMemoWorkflowStatus,
     cloudSync: {
       phase: cloudPhase,

@@ -306,6 +306,9 @@ const messagesEn = {
   "ctx.complete": "Mark complete",
   "ctx.uncomplete": "Clear complete",
   "ctx.addNoteToggle": "Note",
+  "ctx.copy": "Copy",
+  "ctx.cut": "Cut",
+  "ctx.paste": "Paste",
 
   // Custom card UI
   "card.titlePh": "Card title…",
@@ -326,6 +329,12 @@ const messagesEn = {
   "table.addColumn": "+ Col",
   "table.addRow": "+ Row",
   "table.colPh": "Column",
+
+  // Auto-reset (loop checklist)
+  "ctx.autoReset": "Auto reset",
+  "ctx.autoResetOff": "OFF",
+  "ctx.autoReset1h": "1h",
+  "ctx.autoReset1d": "1d",
 } as const;
 
 const messagesJa: Record<MessageId, string> = {
@@ -623,6 +632,9 @@ const messagesJa: Record<MessageId, string> = {
   "ctx.complete": "完了にする",
   "ctx.uncomplete": "完了を解除",
   "ctx.addNoteToggle": "ノートを追加",
+  "ctx.copy": "コピー",
+  "ctx.cut": "切り取り",
+  "ctx.paste": "貼り付け",
 
   // Custom card UI
   "card.titlePh": "カードのタイトル…",
@@ -643,6 +655,12 @@ const messagesJa: Record<MessageId, string> = {
   "table.addColumn": "+ 列",
   "table.addRow": "+ 行",
   "table.colPh": "列名",
+
+  // Auto-reset (loop checklist)
+  "ctx.autoReset": "自動リセット",
+  "ctx.autoResetOff": "なし",
+  "ctx.autoReset1h": "1時間",
+  "ctx.autoReset1d": "1日",
 };
 
 export const messages = {

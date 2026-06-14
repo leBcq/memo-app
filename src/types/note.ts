@@ -152,6 +152,11 @@ export const DEFAULT_GAME_DATA: NoteGameData = {
   description: "",
 };
 
+// ─── Task auto-reset ─────────────────────────────────────────────────────────
+
+/** How long after a task is completed before it automatically resets to uncomplete. */
+export type ResetInterval = "none" | "1hour" | "1day";
+
 export interface NoteNode {
   id: string;
   content: string;
@@ -172,6 +177,10 @@ export interface NoteNode {
   cardData?: CustomCardData;
   /** Attached spreadsheet table — rendered below the node body, independent of card/plugin/game data. */
   tableData?: TableData;
+  /** Auto-reset interval. undefined / "none" means no auto-reset. */
+  resetInterval?: ResetInterval;
+  /** ISO timestamp when the checkbox was last set to completed. null when unchecked. */
+  checkedAt: string | null;
 }
 
 const createId = () => {
@@ -194,7 +203,16 @@ export function normalizeGameData(raw: unknown): NoteGameData {
 }
 
 export function createNode(partial?: Partial<NoteNode>): NoteNode {
-  const { pluginData: pIn, gameData: gIn, cardData: cIn, tableData: tIn, id: idPartial, ...rest } = partial ?? {};
+  const {
+    pluginData: pIn,
+    gameData: gIn,
+    cardData: cIn,
+    tableData: tIn,
+    checkedAt: checkedAtIn,
+    resetInterval: resetIntervalIn,
+    id: idPartial,
+    ...rest
+  } = partial ?? {};
   let pluginData = pIn !== undefined ? normalizePluginData(pIn) : undefined;
   let gameData = gIn !== undefined ? normalizeGameData(gIn) : undefined;
   let cardData = cIn !== undefined ? normalizeCustomCardData(cIn) : undefined;
@@ -222,6 +240,8 @@ export function createNode(partial?: Partial<NoteNode>): NoteNode {
     gameData,
     cardData,
     tableData: tIn !== undefined ? normalizeTableData(tIn) : undefined,
+    checkedAt: checkedAtIn ?? null,
+    resetInterval: resetIntervalIn,
   };
 }
 
@@ -286,6 +306,8 @@ export function cloneNoteTreeForPersistence(nodes: NoteNode[]): NoteNode[] {
     ...(n.gameData !== undefined ? { gameData: n.gameData } : {}),
     ...(n.cardData !== undefined ? { cardData: n.cardData } : {}),
     ...(n.tableData !== undefined ? { tableData: n.tableData } : {}),
+    checkedAt: n.checkedAt ?? null,
+    ...(n.resetInterval !== undefined ? { resetInterval: n.resetInterval } : {}),
   }));
 }
 
@@ -319,6 +341,12 @@ export function normalizeNode(raw: Partial<NoteNode> & { children?: unknown }): 
     else if (pluginData) gameData = undefined;
   }
 
+  const resetIntervalRaw = (raw as Partial<NoteNode>).resetInterval;
+  const resetInterval: ResetInterval | undefined =
+    resetIntervalRaw === "1hour" || resetIntervalRaw === "1day" || resetIntervalRaw === "none"
+      ? resetIntervalRaw
+      : undefined;
+
   return createNode({
     id: raw.id,
     content: typeof raw.content === "string" ? raw.content : "",
@@ -335,5 +363,7 @@ export function normalizeNode(raw: Partial<NoteNode> & { children?: unknown }): 
     gameData,
     cardData,
     tableData,
+    checkedAt: typeof raw.checkedAt === "string" ? raw.checkedAt : null,
+    resetInterval,
   });
 }

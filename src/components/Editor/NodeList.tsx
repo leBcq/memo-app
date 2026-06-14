@@ -2,7 +2,7 @@
 
 import NoteNode from "@/components/Editor/NoteNode";
 import type { MemoType } from "@/types/memoKind";
-import type { NoteNode as NoteNodeType, NotePluginData, NoteGameData, CustomCardProperty } from "@/types/note";
+import type { NoteNode as NoteNodeType, NotePluginData, NoteGameData, CustomCardProperty, ResetInterval } from "@/types/note";
 
 type NodeListProps = {
   nodes: NoteNodeType[];
@@ -51,6 +51,10 @@ type NodeListProps = {
   onRemoveTableRow: (id: string, rowId: string) => void;
   onPatchTableCell: (id: string, rowId: string, colId: string, value: string, historyMode?: "immediate" | "none") => void;
   onRemoveTable: (id: string) => void;
+  onSetResetInterval: (id: string, interval: ResetInterval) => void;
+  onCopyNode: (id: string) => void;
+  onCutNode: (id: string) => void;
+  onPasteNode: (id: string) => void;
   onMemoColorSliderUndoGestureStart?: () => void;
   onMemoColorSliderUndoGestureEnd?: () => void;
   onPatchNodeContents: (patches: Record<string, string>) => void;
@@ -108,6 +112,10 @@ export default function NodeList({
   onRemoveTableRow,
   onPatchTableCell,
   onRemoveTable,
+  onSetResetInterval,
+  onCopyNode,
+  onCutNode,
+  onPasteNode,
   onMemoColorSliderUndoGestureStart,
   onMemoColorSliderUndoGestureEnd,
   onPatchNodeContents,
@@ -164,6 +172,10 @@ export default function NodeList({
           onRemoveTableRow={onRemoveTableRow}
           onPatchTableCell={onPatchTableCell}
           onRemoveTable={onRemoveTable}
+          onSetResetInterval={onSetResetInterval}
+          onCopyNode={onCopyNode}
+          onCutNode={onCutNode}
+          onPasteNode={onPasteNode}
           themeColor={themeColor}
           themeChromeAlphaMult={themeChromeAlphaMult}
           onMemoColorSliderUndoGestureStart={onMemoColorSliderUndoGestureStart}
