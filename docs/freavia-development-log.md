@@ -21,6 +21,39 @@
 
 ---
 
+### 2026-06-15 — コンテキストメニューUIバグ修正・Ctrl+C/V 階層コピペ完全対応
+
+**種別**: バグ修正
+
+#### 修正した内容
+
+| # | 内容 | 種別 |
+|---|---|---|
+| 1 | コンテキストメニューの「カードを追加」「表を追加」が絵文字アイコン二重表示になっていたバグを修正 | バグ修正 |
+| 2 | Ctrl+C / Ctrl+X がブロック選択なし（単一フォーカスノード）でも階層コピー・カットできるよう修正 | バグ修正 |
+| 3 | Ctrl+V（paste イベント）が完全に未実装だったため、内部クリップボードからの階層ペーストを追加 | バグ修正 |
+
+#### 変更ファイル
+
+| ファイル | 変更種別 | 内容 |
+|---|---|---|
+| `src/i18n/messages.ts` | 修正 | `ctx.addCard`・`ctx.addTable` のEN/JA翻訳文から絵文字プレフィックスを削除（絵文字は `NodeContextMenu` の `icon` prop 側で一元管理） |
+| `src/app/page.tsx` | 修正 | `onCopy`/`onCut`: `selectedIds` が空の場合も `activeId`（フォーカス中ノード）にフォールバックして階層コピー実行。`onPaste`: `document.addEventListener("paste", ...)` を新規追加。`pasteNodesAfter(activeId)` が `true` を返した場合のみ `preventDefault()` し、`_nodeClipboard` が空の場合はブラウザ標準テキストペーストにフォールスルー |
+
+#### 設計上の重要な判断
+
+- **Ctrl+V フォールスルー設計**: 内部クリップボード (`_nodeClipboard`) が空の場合は `pasteNodesAfter` が `false` を返すため `preventDefault()` を呼ばない。これにより、階層データがない場合はブラウザのネイティブテキストペーストが通常通り動作する。
+- **絵文字の二重管理を排除**: i18nメッセージ文字列に絵文字を含めるとコンポーネント側の `icon` prop と重複する。絵文字はUI層（`NodeContextMenu.tsx` の `icon` prop）のみで管理し、翻訳文は純粋なラベル文字列とする。
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → 出力なし（エラーゼロ）
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-11 — アウトライナー操作性の強化（階層コピペ・複数選択Cut修正）
 
 **種別**: バグ修正 / 新機能

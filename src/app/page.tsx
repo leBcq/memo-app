@@ -1183,7 +1183,7 @@ export default function Home() {
     };
   }, [settings.selectionModeModifier]);
 
-  // ── Copy / Cut: hijack when block selection is active (capture phase) ───────
+  // ── Copy / Cut / Paste: structural clipboard (capture phase) ───────────────
   useEffect(() => {
     const isNativeTextSelection = () => {
       const active = document.activeElement as HTMLElement | null;
@@ -1193,34 +1193,49 @@ export default function Home() {
     };
 
     const onCopy = (e: ClipboardEvent) => {
-      if (selectedIds.length === 0) return;
       if (isNativeTextSelection()) return;
+      // Use block selection if active, otherwise fall back to focused node
+      const ids = selectedIds.length > 0 ? selectedIds : activeId ? [activeId] : [];
+      if (ids.length === 0) return;
       e.preventDefault();
       e.stopPropagation();
-      storeSelectedToClipboard(selectedIds);
-      const text = collectSelectedText(displayNodes, new Set(selectedIds));
+      storeSelectedToClipboard(ids);
+      const text = collectSelectedText(displayNodes, new Set(ids));
       e.clipboardData?.setData("text/plain", text);
     };
 
     const onCut = (e: ClipboardEvent) => {
-      if (selectedIds.length === 0) return;
       if (isNativeTextSelection()) return;
+      const ids = selectedIds.length > 0 ? selectedIds : activeId ? [activeId] : [];
+      if (ids.length === 0) return;
       e.preventDefault();
       e.stopPropagation();
-      storeSelectedToClipboard(selectedIds);
-      const text = collectSelectedText(displayNodes, new Set(selectedIds));
+      storeSelectedToClipboard(ids);
+      const text = collectSelectedText(displayNodes, new Set(ids));
       e.clipboardData?.setData("text/plain", text);
-      deleteSelectedNodes(selectedIds);
+      deleteSelectedNodes(ids);
       setSelectedIds([]);
+    };
+
+    const onPaste = (e: ClipboardEvent) => {
+      // Structural paste takes priority when internal clipboard is loaded.
+      // pasteNodesAfter returns false when _nodeClipboard is empty → fall through to native paste.
+      const pasted = pasteNodesAfter(activeId);
+      if (pasted) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
     };
 
     document.addEventListener("copy", onCopy, true);
     document.addEventListener("cut", onCut, true);
+    document.addEventListener("paste", onPaste, true);
     return () => {
       document.removeEventListener("copy", onCopy, true);
       document.removeEventListener("cut", onCut, true);
+      document.removeEventListener("paste", onPaste, true);
     };
-  }, [selectedIds, displayNodes, storeSelectedToClipboard, deleteSelectedNodes]);
+  }, [selectedIds, activeId, displayNodes, storeSelectedToClipboard, deleteSelectedNodes, pasteNodesAfter]);
 
   return (
     <div className="group/app flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950 text-zinc-100">

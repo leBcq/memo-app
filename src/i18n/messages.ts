@@ -294,7 +294,7 @@ const messagesEn = {
   "ctx.toggleNote": "Note",
   "ctx.turnPlugin": "Turn into Plugin Card",
   "ctx.turnSpec": "Turn into Spec Card",
-  "ctx.addCard": "🧩 Add Card",
+  "ctx.addCard": "Add Card",
   "ctx.glossaryToggle": "Glossary overlay",
 
   "ctx.focusThisNode": "Focus on this node",
@@ -322,7 +322,7 @@ const messagesEn = {
   "card.typeToggleMulti": "→ Multi-line",
 
   // Table attachment
-  "ctx.addTable": "📊 Add Table",
+  "ctx.addTable": "Add Table",
   "table.badge": "TABLE",
   "table.removeTable": "Remove Table",
   "table.removeTableConfirm": "Remove this table?",
@@ -620,7 +620,7 @@ const messagesJa: Record<MessageId, string> = {
   "ctx.toggleNote": "ノート",
   "ctx.turnPlugin": "プラグインカードに変換",
   "ctx.turnSpec": "仕様カードに変換",
-  "ctx.addCard": "🧩 カードを追加",
+  "ctx.addCard": "カードを追加",
   "ctx.glossaryToggle": "用語解説オーバーレイ",
 
   "ctx.focusThisNode": "このノードにフォーカス",
@@ -648,7 +648,7 @@ const messagesJa: Record<MessageId, string> = {
   "card.typeToggleMulti": "→ 複数行",
 
   // Table attachment
-  "ctx.addTable": "📊 表を追加",
+  "ctx.addTable": "表を追加",
   "table.badge": "TABLE",
   "table.removeTable": "表を削除",
   "table.removeTableConfirm": "この表を削除しますか？",
