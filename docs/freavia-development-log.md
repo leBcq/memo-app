@@ -21,6 +21,37 @@
 
 ---
 
+### 2026-06-17 — クリップボード干渉バグ修正（Ctrl+V / Win+V / テキスト選択コピー）
+
+**種別**: バグ修正（重篤）
+
+#### 修正した内容
+
+| # | 現象 | 修正内容 |
+|---|---|---|
+| 1 | 一度ノードをコピーすると `_nodeClipboard` が残り続け、Win+V や別アプリからのテキストペーストが常にノード貼り付けに上書きされる | `onPaste` に `active?.isContentEditable` ガードを追加。contenteditable がフォーカス中は構造ペーストを完全スキップし、ネイティブテキストペーストにフォールスルー |
+| 2 | コンテキストメニューから「コピー」「切り取り」すると、テキストを部分選択していてもノード全体が操作される | `handleContextMenuCopy` / `handleContextMenuCut` の冒頭に `window.getSelection()?.toString()` チェックを追加。テキスト選択中は `document.execCommand("copy"/"cut")` で選択テキストのみを操作し早期リターン |
+
+#### 変更ファイル
+
+| ファイル | 変更種別 | 内容 |
+|---|---|---|
+| `src/app/page.tsx` | 修正 | `onPaste`: `document.activeElement?.isContentEditable` が true の場合は即 return（Win+V・クロスアプリペースト・通常テキスト編集を完全保護）。`handleContextMenuCopy`/`handleContextMenuCut`: テキスト選択中は `document.execCommand` でブラウザ標準動作を実行して return、選択なしの場合のみ階層コピペ処理へ進む |
+
+#### 設計上の重要な判断
+
+- **構造ペーストの発動条件を厳格化**: `_nodeClipboard` にデータがあっても、contenteditable がアクティブな場合はネイティブペーストを一切妨害しない。構造ペーストが発動するのは「ブロック選択モード中」や「ノードからフォーカスが外れた状態」のみ。
+- **コンテキストメニューの `onMouseDown` と連携**: NodeContextMenu は `onMouseDown` で `e.preventDefault()` を呼ぶことでボタンクリック時もブラウザのテキスト選択を保持する。この仕様を利用し、コピーボタンクリック時点で `window.getSelection().toString()` が選択テキストを返す。
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → 出力なし（エラーゼロ）
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-15 — コンテキストメニューUIバグ修正・Ctrl+C/V 階層コピペ完全対応
 
 **種別**: バグ修正

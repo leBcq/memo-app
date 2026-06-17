@@ -436,6 +436,12 @@ export default function Home() {
 
   const handleContextMenuCopy = useCallback(
     (nodeId: string) => {
+      // If the user has text selected inside a node, copy only that text.
+      // The context menu preserves selection via e.preventDefault() on its onMouseDown.
+      if (window.getSelection()?.toString()) {
+        document.execCommand("copy");
+        return;
+      }
       const ids = selectedIds.includes(nodeId) && selectedIds.length > 0 ? selectedIds : [nodeId];
       storeSelectedToClipboard(ids);
     },
@@ -444,6 +450,10 @@ export default function Home() {
 
   const handleContextMenuCut = useCallback(
     (nodeId: string) => {
+      if (window.getSelection()?.toString()) {
+        document.execCommand("cut");
+        return;
+      }
       const ids = selectedIds.includes(nodeId) && selectedIds.length > 0 ? selectedIds : [nodeId];
       storeSelectedToClipboard(ids);
       deleteSelectedNodes(ids);
@@ -1218,8 +1228,11 @@ export default function Home() {
     };
 
     const onPaste = (e: ClipboardEvent) => {
-      // Structural paste takes priority when internal clipboard is loaded.
-      // pasteNodesAfter returns false when _nodeClipboard is empty → fall through to native paste.
+      // Never intercept paste when a text field is focused — covers Win+V, cross-app paste,
+      // and any normal text editing. Structural paste only fires when no contenteditable
+      // is active (e.g. block-selection mode or after blurring a node).
+      const active = document.activeElement as HTMLElement | null;
+      if (active?.isContentEditable) return;
       const pasted = pasteNodesAfter(activeId);
       if (pasted) {
         e.preventDefault();
