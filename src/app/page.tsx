@@ -1193,18 +1193,17 @@ export default function Home() {
     };
   }, [settings.selectionModeModifier]);
 
-  // ── Copy / Cut / Paste: structural clipboard (capture phase) ───────────────
+  // ── Copy / Cut / Paste: structural clipboard wins only in node-selection context ──
   useEffect(() => {
-    const isNativeTextSelection = () => {
-      const active = document.activeElement as HTMLElement | null;
-      if (!active?.isContentEditable) return false;
-      const sel = window.getSelection();
-      return !!(sel && !sel.isCollapsed && sel.anchorNode && active.contains(sel.anchorNode));
-    };
+    // Ctrl-multi-select (selectedIds) or block-selection mode is the signal that the
+    // user means "nodes", not "text" — hierarchical clipboard then overrides native
+    // behavior even while a contentEditable happens to be focused. Outside that
+    // context, do nothing and let the browser's native copy/cut/paste run untouched
+    // (preserves in-editor text selection copy and Win+V / cross-app paste).
+    const isNodeSelectionContext = () => selectedIds.length > 0 || effectiveSelectionMode;
 
     const onCopy = (e: ClipboardEvent) => {
-      if (isNativeTextSelection()) return;
-      // Use block selection if active, otherwise fall back to focused node
+      if (!isNodeSelectionContext()) return;
       const ids = selectedIds.length > 0 ? selectedIds : activeId ? [activeId] : [];
       if (ids.length === 0) return;
       e.preventDefault();
@@ -1215,7 +1214,7 @@ export default function Home() {
     };
 
     const onCut = (e: ClipboardEvent) => {
-      if (isNativeTextSelection()) return;
+      if (!isNodeSelectionContext()) return;
       const ids = selectedIds.length > 0 ? selectedIds : activeId ? [activeId] : [];
       if (ids.length === 0) return;
       e.preventDefault();
@@ -1228,11 +1227,7 @@ export default function Home() {
     };
 
     const onPaste = (e: ClipboardEvent) => {
-      // Never intercept paste when a text field is focused — covers Win+V, cross-app paste,
-      // and any normal text editing. Structural paste only fires when no contenteditable
-      // is active (e.g. block-selection mode or after blurring a node).
-      const active = document.activeElement as HTMLElement | null;
-      if (active?.isContentEditable) return;
+      if (!isNodeSelectionContext()) return;
       const pasted = pasteNodesAfter(activeId);
       if (pasted) {
         e.preventDefault();
@@ -1248,7 +1243,7 @@ export default function Home() {
       document.removeEventListener("cut", onCut, true);
       document.removeEventListener("paste", onPaste, true);
     };
-  }, [selectedIds, activeId, displayNodes, storeSelectedToClipboard, deleteSelectedNodes, pasteNodesAfter]);
+  }, [selectedIds, effectiveSelectionMode, activeId, displayNodes, storeSelectedToClipboard, deleteSelectedNodes, pasteNodesAfter]);
 
   return (
     <div className="group/app flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950 text-zinc-100">
