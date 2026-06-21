@@ -1193,17 +1193,18 @@ export default function Home() {
     };
   }, [settings.selectionModeModifier]);
 
-  // ── Copy / Cut / Paste: structural clipboard wins only in node-selection context ──
+  // ── Copy / Cut / Paste: strict priority — ① text selection ② node selection ③ native ──
   useEffect(() => {
-    // Ctrl-multi-select (selectedIds) or block-selection mode is the signal that the
-    // user means "nodes", not "text" — hierarchical clipboard then overrides native
-    // behavior even while a contentEditable happens to be focused. Outside that
-    // context, do nothing and let the browser's native copy/cut/paste run untouched
-    // (preserves in-editor text selection copy and Win+V / cross-app paste).
+    // ① A non-empty text selection always wins, unconditionally — never preventDefault.
+    // This is what lets mouse-dragged text copy/cut and Win+V / cross-app paste work.
+    const hasTextSelected = () => (window.getSelection()?.toString().length ?? 0) > 0;
+    // ② Only once no text is selected do we check for Freavia's node block-selection context.
     const isNodeSelectionContext = () => selectedIds.length > 0 || effectiveSelectionMode;
 
     const onCopy = (e: ClipboardEvent) => {
-      if (!isNodeSelectionContext()) return;
+      if (hasTextSelected()) return; // ① native text copy
+      if (!isNodeSelectionContext()) return; // ③ nothing selected at all → native no-op
+      // ② hierarchical node copy
       const ids = selectedIds.length > 0 ? selectedIds : activeId ? [activeId] : [];
       if (ids.length === 0) return;
       e.preventDefault();
@@ -1214,7 +1215,9 @@ export default function Home() {
     };
 
     const onCut = (e: ClipboardEvent) => {
-      if (!isNodeSelectionContext()) return;
+      if (hasTextSelected()) return; // ① native text cut
+      if (!isNodeSelectionContext()) return; // ③ native no-op
+      // ② hierarchical node cut
       const ids = selectedIds.length > 0 ? selectedIds : activeId ? [activeId] : [];
       if (ids.length === 0) return;
       e.preventDefault();
@@ -1227,7 +1230,9 @@ export default function Home() {
     };
 
     const onPaste = (e: ClipboardEvent) => {
-      if (!isNodeSelectionContext()) return;
+      if (hasTextSelected()) return; // ① native paste (replaces selection, Win+V, cross-app)
+      if (!isNodeSelectionContext()) return; // ③ native paste
+      // ② hierarchical node paste
       const pasted = pasteNodesAfter(activeId);
       if (pasted) {
         e.preventDefault();
