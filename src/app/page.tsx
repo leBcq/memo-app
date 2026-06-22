@@ -426,6 +426,7 @@ export default function Home() {
     patchTableCell,
     setResetInterval,
     storeSelectedToClipboard,
+    clearNodeClipboard,
     deleteSelectedNodes,
     pasteNodesAfter,
     cloudSync,
@@ -1202,7 +1203,12 @@ export default function Home() {
     const isNodeSelectionContext = () => selectedIds.length > 0 || effectiveSelectionMode;
 
     const onCopy = (e: ClipboardEvent) => {
-      if (hasTextSelected()) return; // ① native text copy
+      if (hasTextSelected()) {
+        // ① native text copy — drop any stale structural clipboard so a later
+        // paste doesn't resurrect a node copied long before this text copy.
+        clearNodeClipboard();
+        return;
+      }
       if (!isNodeSelectionContext()) return; // ③ nothing selected at all → native no-op
       // ② hierarchical node copy
       const ids = selectedIds.length > 0 ? selectedIds : activeId ? [activeId] : [];
@@ -1215,7 +1221,11 @@ export default function Home() {
     };
 
     const onCut = (e: ClipboardEvent) => {
-      if (hasTextSelected()) return; // ① native text cut
+      if (hasTextSelected()) {
+        // ① native text cut — same staleness guard as onCopy.
+        clearNodeClipboard();
+        return;
+      }
       if (!isNodeSelectionContext()) return; // ③ native no-op
       // ② hierarchical node cut
       const ids = selectedIds.length > 0 ? selectedIds : activeId ? [activeId] : [];
@@ -1248,7 +1258,7 @@ export default function Home() {
       document.removeEventListener("cut", onCut, true);
       document.removeEventListener("paste", onPaste, true);
     };
-  }, [selectedIds, effectiveSelectionMode, activeId, displayNodes, storeSelectedToClipboard, deleteSelectedNodes, pasteNodesAfter]);
+  }, [selectedIds, effectiveSelectionMode, activeId, displayNodes, storeSelectedToClipboard, clearNodeClipboard, deleteSelectedNodes, pasteNodesAfter]);
 
   return (
     <div className="group/app flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950 text-zinc-100">

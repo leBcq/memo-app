@@ -1639,6 +1639,11 @@ export function useMemos() {
     _nodeClipboard = roots.length > 0 ? roots : null;
   }, []);
 
+  /** Drops the structural clipboard — called when the user copies/cuts plain text instead of nodes. */
+  const clearNodeClipboard = useCallback(() => {
+    _nodeClipboard = null;
+  }, []);
+
   const deleteSelectedNodes = useCallback(
     (nodeIds: string[]) => {
       const memo = memosRef.current.find((m) => m.id === activeMemoIdRef.current);
@@ -2394,6 +2399,7 @@ export function useMemos() {
     removeTableRow,
     patchTableCell,
     storeSelectedToClipboard,
+    clearNodeClipboard,
     deleteSelectedNodes,
     pasteNodesAfter,
     setMemoWorkflowStatus,
