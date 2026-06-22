@@ -21,6 +21,38 @@
 
 ---
 
+### 2026-06-22 02 — テキストメニューの挙動をショートカットの優先ロジックと完全同期（文字選択優先）
+
+**種別**: バグ修正 / 一貫性改善
+
+#### 修正した内容
+
+右クリックのコンテキストメニュー「コピー」「切り取り」「貼り付け」が、Ctrl+C/X/V のキーボードショートカットと異なる優先順位で動作していたため統一。
+
+| # | 内容 |
+|---|---|
+| 1 | `handleContextMenuCopy`/`handleContextMenuCut`: 文字選択中（`window.getSelection().toString().length > 0`）は `document.execCommand("copy"/"cut")` で選択テキストのみを処理し、直後に `clearNodeClipboard()` を呼んで内部構造クリップボードの残留を防止。文字選択なしの場合のみノード階層コピー/カットを実行 |
+| 2 | `handleContextMenuPaste`: `pasteNodesAfter(nodeId)` が `false`（内部クリップボードが空、または直前のテキストコピーでクリア済み）を返した場合、`navigator.clipboard.readText()` でシステムクリップボードのプレーンテキストを読み取り `insertSiblingWithPlainTextAfter` でテキストペーストにフォールバック（モバイル版の `mobileActionsPaste` と同じ安全弁パターン） |
+
+#### 変更ファイル
+
+| ファイル | 変更種別 | 内容 |
+|---|---|---|
+| `src/app/page.tsx` | 修正 | `handleContextMenuCopy`/`handleContextMenuCut` に文字選択時の `clearNodeClipboard()` 呼び出しを追加。`handleContextMenuPaste` をテキストフォールバック対応に拡張し、依存配列に `clearNodeClipboard`/`insertSiblingWithPlainTextAfter` を追加 |
+
+#### 設計上の重要な判断
+
+- **キーボードとメニューで判定ロジックを共通化**: 「① 文字選択 → ブラウザ標準処理＋内部キャッシュクリア／② ノード選択 → 階層コピペ／③ クリップボード空 → プレーンテキストフォールバック」という同一の優先順位を、`onCopy`/`onCut`/`onPaste`（キーボード）と `handleContextMenuCopy`/`Cut`/`Paste`（メニュー）の両方の経路で揃えることで、操作手段によって挙動が異なるという混乱を排除した。
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → 出力なし（エラーゼロ）
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-22 — 通常テキストコピー時の内部キャッシュクリアによるコピペ干渉の完全修正
 
 **種別**: バグ修正（重篤・クリップボード状態残留）

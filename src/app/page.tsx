@@ -435,24 +435,27 @@ export default function Home() {
 
   const { user } = useAuth();
 
+  // ── Context menu copy/cut/paste: mirrors the Ctrl+C/X/V priority — ① text selection ② node ──
   const handleContextMenuCopy = useCallback(
     (nodeId: string) => {
       // If the user has text selected inside a node, copy only that text.
       // The context menu preserves selection via e.preventDefault() on its onMouseDown.
       if (window.getSelection()?.toString()) {
         document.execCommand("copy");
+        clearNodeClipboard(); // drop stale structural clipboard, same as the keyboard path
         return;
       }
       const ids = selectedIds.includes(nodeId) && selectedIds.length > 0 ? selectedIds : [nodeId];
       storeSelectedToClipboard(ids);
     },
-    [selectedIds, storeSelectedToClipboard],
+    [selectedIds, storeSelectedToClipboard, clearNodeClipboard],
   );
 
   const handleContextMenuCut = useCallback(
     (nodeId: string) => {
       if (window.getSelection()?.toString()) {
         document.execCommand("cut");
+        clearNodeClipboard();
         return;
       }
       const ids = selectedIds.includes(nodeId) && selectedIds.length > 0 ? selectedIds : [nodeId];
@@ -460,14 +463,24 @@ export default function Home() {
       deleteSelectedNodes(ids);
       setSelectedIds([]);
     },
-    [selectedIds, storeSelectedToClipboard, deleteSelectedNodes],
+    [selectedIds, storeSelectedToClipboard, clearNodeClipboard, deleteSelectedNodes],
   );
 
   const handleContextMenuPaste = useCallback(
     (nodeId: string) => {
-      pasteNodesAfter(nodeId);
+      // Structural paste only when the internal clipboard actually holds nodes;
+      // otherwise fall back to plain-text paste from the system clipboard, same
+      // safety net as the keyboard Ctrl+V path and the mobile paste action.
+      const pasted = pasteNodesAfter(nodeId);
+      if (pasted) return;
+      navigator.clipboard
+        .readText()
+        .then((text) => {
+          if (text.trim()) insertSiblingWithPlainTextAfter(nodeId, text);
+        })
+        .catch(() => { /* clipboard permission denied — no-op */ });
     },
-    [pasteNodesAfter],
+    [pasteNodesAfter, insertSiblingWithPlainTextAfter],
   );
 
   const handleSetBgColor = useCallback(
