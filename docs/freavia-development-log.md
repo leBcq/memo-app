@@ -21,6 +21,77 @@
 
 ---
 
+### 2026-06-23 02 — ログイン前デフォルト画面のリファクタリング（個人メモの露出を排除し、ミニマルなウェルカムUIへ変更）
+
+**種別**: セキュリティ／UX改善
+
+#### 現象
+
+未認証状態（ログイン前）でも `page.tsx` がそのままエディタをレンダリングしており、`useMemos.ts` の `DEFAULT_MEMOS`（"Track Memo"・"Game Dev"・"Ideas" などの具体的な個人メモ内容・ノードデータ）がそのまま画面に表示されてしまっていた。
+
+#### 修正した内容
+
+| # | 内容 |
+|---|---|
+| 1 | `src/components/WelcomeScreen.tsx` を新規作成。中央に幾何学的なロゴアイコン＋「FREAVIA」ロゴテキスト、サブタイトル「A GEOMETRIC OUTLINER FOR CREATORS.」、その下に「SIGN IN」ボタンのみを配置したミニマルなダークUI |
+| 2 | `src/app/page.tsx`: `useAuth()` から `loading`・`configured`・`signInWithGoogle` を追加で分割代入。全フック呼び出し後（コンポーネント末尾の最終 `return` 直前）に `if (authConfigured && !authLoading && !user) return <WelcomeScreen onSignIn={signInWithGoogle} />;` を追加し、未認証時はメモ内容を一切レンダリングしないよう完全にゲート |
+
+#### 変更ファイル
+
+| ファイル | 変更種別 | 内容 |
+|---|---|---|
+| `src/components/WelcomeScreen.tsx` | 新規 | ログイン前ゲート画面。メモデータを一切含まない、ロゴ・サブタイトル・サインインボタンのみのプレゼンテーショナルコンポーネント |
+| `src/app/page.tsx` | 修正 | 認証状態の分割代入を拡張。全Hooks実行後・JSXレンダリング直前に未認証ゲートの早期 return を追加（Hooksのルールに抵触しないよう、条件分岐は全フック呼び出し完了後に配置） |
+
+#### 設計上の重要な判断
+
+- **ローカルモード（Supabase未設定）は対象外**: `authConfigured` が `false`（`NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` 未設定）の場合はログイン概念自体が存在しないため、ゲートをスキップしそのままローカルデータでエディタを表示する。認証バックエンドがある環境でのみ、未ログイン時にウェルカム画面を強制する。
+- **Hooksルール厳守**: 早期 return はコンポーネント内の全 Hook 呼び出し（`useMemos`・`useEffect`・`useMemo` 等）が実行された後、最終 JSX の `return` 直前にのみ配置。レンダーごとに呼び出される Hook の数・順序が変わらないことを保証。
+- **`DEFAULT_MEMOS` 自体は削除しない**: ログイン後・ローカルモードでの初回起動時シードデータとして引き続き利用するため、データ自体の削除ではなく「未認証画面に表示させない」というゲーティングで対応した。
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → 出力なし（エラーゼロ）
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
+### 2026-06-23 — テキストメニューからの非同期テキスト貼り付け（Clipboard API）の不具合を修正
+
+**種別**: バグ修正
+
+#### 修正した内容
+
+コンテキストメニューの「📥 貼り付け」が、内部クリップボードが空の場合に通常のプレーンテキストを正しく貼り付けられるよう、`handleContextMenuPaste` を `async/await` ベースのハイブリッド処理に明確化。
+
+| # | 内容 |
+|---|---|
+| 1 | `handleContextMenuPaste` を `async` 関数に変更。① `pasteNodesAfter(nodeId)` が `true` を返せば階層ペーストとして完了 |
+| 2 | ② 内部クリップボードが空（`false` 返却）の場合は `await navigator.clipboard.readText()` でシステムクリップボードのプレーンテキストを取得し、`insertSiblingWithPlainTextAfter(nodeId, text)` でターゲットノード直後に挿入 |
+| 3 | クリップボード読み取りの権限拒否・API未対応などのエラーを `try/catch` で確実に捕捉し、何もせず安全に終了（アプリのクラッシュを防止） |
+
+#### 変更ファイル
+
+| ファイル | 変更種別 | 内容 |
+|---|---|---|
+| `src/app/page.tsx` | 修正 | `handleContextMenuPaste` を `(nodeId: string) => void` から `async (nodeId: string) => Promise<void>` に変更し、`.then()/.catch()` チェーンから `try { await ... } catch {}` 構文に統一。ロジック自体（①構造ペースト優先 → ②プレーンテキストフォールバック）は変更なし、エラーハンドリングと可読性を強化 |
+
+#### 設計上の重要な判断
+
+- **async/await への統一**: Promiseチェーン (`.then/.catch`) から `async/await` + `try/catch` に変更することで、モバイル版 `mobileActionsPaste` と同じコードスタイルに統一し、保守性を向上。
+- **NodeContextMenu 側の呼び出しは fire-and-forget で安全**: `onPasteNode()` はメニュー側で同期的に呼ばれ、直後に `onClose()` でメニューがアンマウントされるが、`handleContextMenuPaste` は `page.tsx`（親コンポーネント）側のクロージャのため、メニューのアンマウント後も非同期処理が問題なく完了する。
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → 出力なし（エラーゼロ）
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-22 02 — テキストメニューの挙動をショートカットの優先ロジックと完全同期（文字選択優先）
 
 **種別**: バグ修正 / 一貫性改善

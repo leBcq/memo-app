@@ -14,6 +14,7 @@ import { TrackStatusBar } from "@/components/TrackStatusBar";
 import { GamedevToolbarStrip } from "@/components/GamedevToolbarStrip";
 import { CloudSyncIndicator } from "@/components/CloudSyncIndicator";
 import { PcSidebarToggleButton } from "@/components/PcSidebarToggleButton";
+import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { useMemos } from "@/hooks/useMemos";
 import { useAuth } from "@/contexts/AuthContext";
 import { matchesKeybind } from "@/config/keybinds";
@@ -433,7 +434,7 @@ export default function Home() {
     activeMemoReadOnly,
   } = useMemos();
 
-  const { user } = useAuth();
+  const { user, loading: authLoading, configured: authConfigured, signInWithGoogle } = useAuth();
 
   // ── Context menu copy/cut/paste: mirrors the Ctrl+C/X/V priority — ① text selection ② node ──
   const handleContextMenuCopy = useCallback(
@@ -467,18 +468,19 @@ export default function Home() {
   );
 
   const handleContextMenuPaste = useCallback(
-    (nodeId: string) => {
-      // Structural paste only when the internal clipboard actually holds nodes;
-      // otherwise fall back to plain-text paste from the system clipboard, same
-      // safety net as the keyboard Ctrl+V path and the mobile paste action.
+    async (nodeId: string) => {
+      // ① Structural paste when the internal clipboard actually holds nodes.
       const pasted = pasteNodesAfter(nodeId);
       if (pasted) return;
-      navigator.clipboard
-        .readText()
-        .then((text) => {
-          if (text.trim()) insertSiblingWithPlainTextAfter(nodeId, text);
-        })
-        .catch(() => { /* clipboard permission denied — no-op */ });
+      // ② Internal clipboard empty/cleared → read plain text from the system
+      // clipboard and insert it after the target node. Permission errors or
+      // denials must never crash the app — just skip the insert.
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text.trim()) insertSiblingWithPlainTextAfter(nodeId, text);
+      } catch {
+        /* clipboard read denied/unavailable — no-op */
+      }
     },
     [pasteNodesAfter, insertSiblingWithPlainTextAfter],
   );
@@ -1272,6 +1274,13 @@ export default function Home() {
       document.removeEventListener("paste", onPaste, true);
     };
   }, [selectedIds, effectiveSelectionMode, activeId, displayNodes, storeSelectedToClipboard, clearNodeClipboard, deleteSelectedNodes, pasteNodesAfter]);
+
+  // Auth gate: when Supabase auth is configured and the user isn't signed in, show the
+  // welcome screen instead of the editor — never render memo content pre-login. Local-only
+  // mode (no Supabase env configured) has no login concept, so it skips this gate entirely.
+  if (authConfigured && !authLoading && !user) {
+    return <WelcomeScreen onSignIn={signInWithGoogle} />;
+  }
 
   return (
     <div className="group/app flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950 text-zinc-100">
