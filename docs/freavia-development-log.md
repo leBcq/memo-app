@@ -21,6 +21,38 @@
 
 ---
 
+### 2026-06-23 03 — 外部クリップボードの優先（ペースト干渉の修正）およびノードコピー条件の厳格化
+
+**種別**: バグ修正（重篤・クリップボード干渉）
+
+#### 修正した内容
+
+| # | 現象 | 修正内容 |
+|---|---|---|
+| 1 | `selectedIds.length === 0`（単なるカーソルフォーカス）でも Ctrl+C/X を押すと `activeId` の単一ノードが勝手に階層コピーされてしまう | `onCopy`/`onCut` の `activeId` フォールバック処理を完全に削除。`selectedIds.length === 0` の場合は即 return し、ブラウザ標準のテキストコピペにすべて委譲。階層コピー・カットは「明示的なノード複数選択中（`selectedIds.length > 0`）」のみで発動 |
+| 2 | ノードコピー後、別アプリ／別タブで新しいテキストをコピーしても、ペースト時に古い `_nodeClipboard` のノードデータが優先されてしまう | ノードコピー／カット実行時にそのプレーンテキスト表現を `lastCopiedTextRef`（コンポーネントローカルの ref）に保存しつつシステムクリップボードにも書き込む。`onPaste` 発生時に `e.clipboardData.getData("text/plain")` で取得した実際のクリップボード内容と `lastCopiedTextRef.current` を比較し、不一致なら「外部で新しいコピーが行われた」と判断して `_nodeClipboard` を即時クリアし、`preventDefault` を呼ばずブラウザ標準ペーストに完全に委譲 |
+
+#### 変更ファイル
+
+| ファイル | 変更種別 | 内容 |
+|---|---|---|
+| `src/app/page.tsx` | 修正 | `lastCopiedTextRef`（`useRef<string \| null>`）を新規追加。`onCopy`/`onCut`: `activeId` フォールバックを削除し `selectedIds.length === 0` で即 return。コピー成功時に `lastCopiedTextRef.current` を更新。`onPaste`: 冒頭で `incomingText !== lastCopiedTextRef.current` を判定し、不一致なら `clearNodeClipboard()` して native paste へ委譲。`handleContextMenuCopy`/`handleContextMenuCut`（右クリックメニュー）も同じ `lastCopiedTextRef` 追跡＋`navigator.clipboard.writeText` 書き込みに統一し、メニュー経由の構造コピー後もキーボード Ctrl+V との整合性を保つよう、`displayNodes` 定義後の位置に移動 |
+
+#### 設計上の重要な判断
+
+- **「最後に書いたのは自分か」で外部コピーを検知**: システムクリップボードの読み取り専用 API には変更検知の仕組みがないため、Freavia自身が最後に書き込んだテキストを `lastCopiedTextRef` として保持し、ペースト時の実際の内容と突き合わせる差分検知方式を採用。これにより別アプリでのコピーを正確に検出できる。
+- **カーソルフォーカスだけでは絶対に階層コピーを発動しない**: 単一ノードを編集中の何気ない Ctrl+C は、ユーザーがテキストをコピーしたいという意図である可能性が高いため、明示的な複数ノード選択（Ctrlクリック等）がない限り内部クリップボードに一切触れない仕様に統一。
+- **メニュー経由コピーとキーボードコピーの整合性**: 右クリックメニューからの構造コピーもシステムクリップボードへの書き込みと `lastCopiedTextRef` 更新を行うことで、メニューでコピー→キーボードでペーストという混在操作でも誤って「外部コピー」と判定されることを防止。
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → 出力なし（エラーゼロ）
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-23 02 — ログイン前デフォルト画面のリファクタリング（個人メモの露出を排除し、ミニマルなウェルカムUIへ変更）
 
 **種別**: セキュリティ／UX改善

@@ -237,6 +237,8 @@ export default function Home() {
   const crumbLabel = useCallback((node: NoteNode) => crumbLabelRich(node, t), [t]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const activeEditorRef = useRef<HTMLDivElement | null>(null);
+  /** Plain-text the app itself last wrote to the system clipboard via a structural node copy/cut. */
+  const lastCopiedTextRef = useRef<string | null>(null);
   const titleRef = useRef<HTMLInputElement | null>(null);
   const memoWorkspaceRef = useRef<HTMLDivElement | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -436,37 +438,6 @@ export default function Home() {
 
   const { user, loading: authLoading, configured: authConfigured, signInWithGoogle } = useAuth();
 
-  // ── Context menu copy/cut/paste: mirrors the Ctrl+C/X/V priority — ① text selection ② node ──
-  const handleContextMenuCopy = useCallback(
-    (nodeId: string) => {
-      // If the user has text selected inside a node, copy only that text.
-      // The context menu preserves selection via e.preventDefault() on its onMouseDown.
-      if (window.getSelection()?.toString()) {
-        document.execCommand("copy");
-        clearNodeClipboard(); // drop stale structural clipboard, same as the keyboard path
-        return;
-      }
-      const ids = selectedIds.includes(nodeId) && selectedIds.length > 0 ? selectedIds : [nodeId];
-      storeSelectedToClipboard(ids);
-    },
-    [selectedIds, storeSelectedToClipboard, clearNodeClipboard],
-  );
-
-  const handleContextMenuCut = useCallback(
-    (nodeId: string) => {
-      if (window.getSelection()?.toString()) {
-        document.execCommand("cut");
-        clearNodeClipboard();
-        return;
-      }
-      const ids = selectedIds.includes(nodeId) && selectedIds.length > 0 ? selectedIds : [nodeId];
-      storeSelectedToClipboard(ids);
-      deleteSelectedNodes(ids);
-      setSelectedIds([]);
-    },
-    [selectedIds, storeSelectedToClipboard, clearNodeClipboard, deleteSelectedNodes],
-  );
-
   const handleContextMenuPaste = useCallback(
     async (nodeId: string) => {
       // ① Structural paste when the internal clipboard actually holds nodes.
@@ -524,6 +495,47 @@ export default function Home() {
     const target = findNodeById(nodes, focusedNodeId);
     return target ? target.children : nodes;
   }, [nodes, focusedNodeId]);
+
+  // ── Context menu copy/cut/paste: mirrors the Ctrl+C/X/V priority — ① text selection ② node ──
+  const handleContextMenuCopy = useCallback(
+    (nodeId: string) => {
+      // If the user has text selected inside a node, copy only that text.
+      // The context menu preserves selection via e.preventDefault() on its onMouseDown.
+      if (window.getSelection()?.toString()) {
+        document.execCommand("copy");
+        clearNodeClipboard(); // drop stale structural clipboard, same as the keyboard path
+        lastCopiedTextRef.current = null;
+        return;
+      }
+      const ids = selectedIds.includes(nodeId) && selectedIds.length > 0 ? selectedIds : [nodeId];
+      storeSelectedToClipboard(ids);
+      // Mirror the text onto the system clipboard and remember it, so a later Ctrl+V
+      // recognizes this as "our own" copy instead of mistaking it for a stale cache.
+      const text = collectSelectedText(displayNodes, new Set(ids));
+      lastCopiedTextRef.current = text;
+      navigator.clipboard.writeText(text).catch(() => { /* clipboard permission denied — no-op */ });
+    },
+    [selectedIds, storeSelectedToClipboard, clearNodeClipboard, displayNodes],
+  );
+
+  const handleContextMenuCut = useCallback(
+    (nodeId: string) => {
+      if (window.getSelection()?.toString()) {
+        document.execCommand("cut");
+        clearNodeClipboard();
+        lastCopiedTextRef.current = null;
+        return;
+      }
+      const ids = selectedIds.includes(nodeId) && selectedIds.length > 0 ? selectedIds : [nodeId];
+      storeSelectedToClipboard(ids);
+      const text = collectSelectedText(displayNodes, new Set(ids));
+      lastCopiedTextRef.current = text;
+      navigator.clipboard.writeText(text).catch(() => { /* clipboard permission denied — no-op */ });
+      deleteSelectedNodes(ids);
+      setSelectedIds([]);
+    },
+    [selectedIds, storeSelectedToClipboard, clearNodeClipboard, deleteSelectedNodes, displayNodes],
+  );
 
   const focusedNodeSnapshot = useMemo(
     () => (focusedNodeId ? findNodeById(nodes, focusedNodeId) : null),
@@ -1209,29 +1221,28 @@ export default function Home() {
     };
   }, [settings.selectionModeModifier]);
 
-  // ── Copy / Cut / Paste: strict priority — ① text selection ② node selection ③ native ──
+  // ── Copy / Cut / Paste: strict priority — ① text selection ② explicit node block-selection ③ native ──
   useEffect(() => {
     // ① A non-empty text selection always wins, unconditionally — never preventDefault.
     // This is what lets mouse-dragged text copy/cut and Win+V / cross-app paste work.
     const hasTextSelected = () => (window.getSelection()?.toString().length ?? 0) > 0;
-    // ② Only once no text is selected do we check for Freavia's node block-selection context.
-    const isNodeSelectionContext = () => selectedIds.length > 0 || effectiveSelectionMode;
 
     const onCopy = (e: ClipboardEvent) => {
       if (hasTextSelected()) {
         // ① native text copy — drop any stale structural clipboard so a later
         // paste doesn't resurrect a node copied long before this text copy.
         clearNodeClipboard();
+        lastCopiedTextRef.current = null;
         return;
       }
-      if (!isNodeSelectionContext()) return; // ③ nothing selected at all → native no-op
-      // ② hierarchical node copy
-      const ids = selectedIds.length > 0 ? selectedIds : activeId ? [activeId] : [];
-      if (ids.length === 0) return;
+      // ② Hierarchical copy only fires for an explicit Ctrl/block node selection —
+      // a lone blinking caret in a node must never trigger a structural copy.
+      if (selectedIds.length === 0) return; // ③ native no-op
       e.preventDefault();
       e.stopPropagation();
-      storeSelectedToClipboard(ids);
-      const text = collectSelectedText(displayNodes, new Set(ids));
+      storeSelectedToClipboard(selectedIds);
+      const text = collectSelectedText(displayNodes, new Set(selectedIds));
+      lastCopiedTextRef.current = text;
       e.clipboardData?.setData("text/plain", text);
     };
 
@@ -1239,24 +1250,33 @@ export default function Home() {
       if (hasTextSelected()) {
         // ① native text cut — same staleness guard as onCopy.
         clearNodeClipboard();
+        lastCopiedTextRef.current = null;
         return;
       }
-      if (!isNodeSelectionContext()) return; // ③ native no-op
+      if (selectedIds.length === 0) return; // ③ native no-op
       // ② hierarchical node cut
-      const ids = selectedIds.length > 0 ? selectedIds : activeId ? [activeId] : [];
-      if (ids.length === 0) return;
       e.preventDefault();
       e.stopPropagation();
-      storeSelectedToClipboard(ids);
-      const text = collectSelectedText(displayNodes, new Set(ids));
+      storeSelectedToClipboard(selectedIds);
+      const text = collectSelectedText(displayNodes, new Set(selectedIds));
+      lastCopiedTextRef.current = text;
       e.clipboardData?.setData("text/plain", text);
-      deleteSelectedNodes(ids);
+      deleteSelectedNodes(selectedIds);
       setSelectedIds([]);
     };
 
     const onPaste = (e: ClipboardEvent) => {
       if (hasTextSelected()) return; // ① native paste (replaces selection, Win+V, cross-app)
-      if (!isNodeSelectionContext()) return; // ③ native paste
+      // Detect an external copy: if the system clipboard's text no longer matches what
+      // Freavia itself last wrote during a node copy/cut, some other app (or Win+V history)
+      // has overwritten it since — the internal structural cache is stale and must be dropped.
+      const incomingText = e.clipboardData?.getData("text/plain") ?? e.clipboardData?.getData("text") ?? "";
+      if (incomingText && incomingText !== lastCopiedTextRef.current) {
+        clearNodeClipboard();
+        lastCopiedTextRef.current = null;
+        return; // ③ let the native paste insert the fresh external text
+      }
+      if (selectedIds.length === 0) return; // ③ no explicit node selection → native paste
       // ② hierarchical node paste
       const pasted = pasteNodesAfter(activeId);
       if (pasted) {
@@ -1273,7 +1293,7 @@ export default function Home() {
       document.removeEventListener("cut", onCut, true);
       document.removeEventListener("paste", onPaste, true);
     };
-  }, [selectedIds, effectiveSelectionMode, activeId, displayNodes, storeSelectedToClipboard, clearNodeClipboard, deleteSelectedNodes, pasteNodesAfter]);
+  }, [selectedIds, activeId, displayNodes, storeSelectedToClipboard, clearNodeClipboard, deleteSelectedNodes, pasteNodesAfter]);
 
   // Auth gate: when Supabase auth is configured and the user isn't signed in, show the
   // welcome screen instead of the editor — never render memo content pre-login. Local-only
