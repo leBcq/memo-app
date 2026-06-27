@@ -21,6 +21,68 @@
 
 ---
 
+### 2026-06-27 10 — Ctrl+S (Cmd+S) による手動強制同期（セーブ）ショートカットの実装と、保存完了時の視覚的フィードバック追加
+
+**種別**: 機能追加
+
+#### 実装内容
+
+**`src/hooks/useMemos.ts`** — `forceSave` 関数を追加
+
+```typescript
+const forceSave = useCallback(async () => {
+  // 1. デバウンス中の保存をキャンセル
+  if (saveDebounceRef.current) { clearTimeout(...); }
+  // 2. クラウド未接続時: ローカル保存の視覚フィードバックだけ表示
+  if (!cloudReady || !user) { setCloudPhase("saved"); return; }
+  // 3. 全メモを即時アップサート（フィンガープリントチェックをスキップ）
+  for (const m of memosRef.current) { await upsertMemoRow(...); }
+  await replaceUserFolders(...);
+  setCloudPhase("saved");  // → 2秒後に idle へ戻る
+}, [cloudReady, user]);
+```
+
+- デバウンス中の保存タイマーを即座にキャンセルしてから同期を実行するため、「デバウンス待ち → 強制セーブ → 再度デバウンス起動」による二重アップロードを回避
+- 保存後にフィンガープリントを更新し、次回の自動デバウンス保存が重複アップロードしないよう調整
+- `cloudSync.forceSave` としてフックの返り値に追加
+
+**`src/components/CloudSyncIndicator.tsx`** — ローカル保存時の "SAVED" フラッシュを追加
+
+- 変更前: `!remoteEnabled || phase === "idle"` のとき非表示
+- 変更後: `phase === "idle"` のみ非表示。`!remoteEnabled && phase === "saved"` のとき "SAVED"（エメラルド色で 1.4秒フラッシュ）を表示
+
+**`src/app/page.tsx`** — Ctrl+S / Cmd+S のグローバルキーハンドラを追加
+
+```typescript
+useEffect(() => {
+  const onKeyDown = (e: KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "s") {
+      e.preventDefault(); // ブラウザの「名前を付けて保存」ダイアログを完全に抑制
+      void cloudSync.forceSave();
+    }
+  };
+  window.addEventListener("keydown", onKeyDown, true); // capture phase で最優先処理
+  return () => window.removeEventListener("keydown", onKeyDown, true);
+}, [cloudSync.forceSave]);
+```
+
+#### フロー整理
+
+| 状態 | Ctrl+S 押下時の動作 | フィードバック |
+|------|---------------------|----------------|
+| ログイン済み（クラウド有効） | 全メモを即時 Supabase upsert | "SAVE ···" → "OK"（シアン→エメラルド、2秒） |
+| 未ログイン（ローカルのみ） | デバウンスタイマーキャンセルのみ | "SAVED"（エメラルド、1.4秒） |
+| 既に saving 中 | 新しい force save が上書き | 継続中の状態を引き継ぎ |
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → エラーなし
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-27 09 — コンテキストメニューの「タスク」タブを廃止し、内部の機能を「構成」タブへ統合してUIをクリーンアップ
 
 **種別**: UIリファクタリング

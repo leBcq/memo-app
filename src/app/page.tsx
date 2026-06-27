@@ -1130,6 +1130,18 @@ export default function Home() {
     toggleNote(mobileOutlineActionsAnchorId);
   }, [mobileOutlineActionsAnchorId, toggleNote]);
 
+  // ── Ctrl+S / Cmd+S — manual force-save ──────────────────────────────────
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "s") {
+        e.preventDefault();
+        void cloudSync.forceSave();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [cloudSync.forceSave]);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (selectedIds.length === 0 || commandPaletteOpen || settingsOpen) return;

@@ -14,7 +14,9 @@ type Props = {
  * Minimal cyber status chip — fixed bottom-left, does not affect layout flow.
  */
 export function CloudSyncIndicator({ phase, message, remoteEnabled }: Props) {
-  if (!remoteEnabled || phase === "idle") return null;
+  if (phase === "idle") return null;
+  // Show all phases when remote is enabled; show only the "saved" flash for local-only mode
+  if (!remoteEnabled && phase !== "saved") return null;
 
   const label =
     phase === "loading"
@@ -22,7 +24,7 @@ export function CloudSyncIndicator({ phase, message, remoteEnabled }: Props) {
       : phase === "saving"
         ? "SAVE ···"
         : phase === "saved"
-          ? "OK"
+          ? remoteEnabled ? "OK" : "SAVED"
           : phase === "error"
             ? "ERR"
             : "···";

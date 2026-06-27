@@ -720,6 +720,53 @@ export function useMemos() {
     };
   }, [memos, fileItems, isHydrated, cloudReady, user?.id, activeMemoId]);
 
+  const forceSave = useCallback(async () => {
+    // Cancel any in-flight debounced save first
+    if (saveDebounceRef.current) {
+      clearTimeout(saveDebounceRef.current);
+      saveDebounceRef.current = null;
+    }
+
+    if (!cloudReady || !user) {
+      // Local-only mode: still give brief visual feedback so the shortcut feels responsive
+      setCloudPhase("saved");
+      window.setTimeout(() => {
+        setCloudPhase((p) => (p === "saved" ? "idle" : p));
+      }, 1400);
+      return;
+    }
+
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+
+    setCloudPhase("saving");
+    setCloudMessage(undefined);
+
+    try {
+      for (const m of memosRef.current) {
+        if (!isUuid(m.id)) continue;
+        if (isMemoReadOnlyForCurrentUser(m, user.id)) continue;
+        const it = fileItemsRef.current.find((i) => i.id === m.id && i.type === "memo");
+        await upsertMemoRow(client, user.id, m, it);
+        // Update fingerprint so the next debounced save skips unchanged memos correctly
+        lastCloudFingerprintRef.current.set(m.id, cloudMemoFingerprint(m, it));
+      }
+
+      const folderItems = fileItemsRef.current.filter((i) => i.type === "folder");
+      await replaceUserFolders(client, user.id, folderItems);
+      lastCloudFolderFingerprintRef.current = cloudFoldersFingerprint(folderItems);
+
+      setCloudPhase("saved");
+      window.setTimeout(() => {
+        setCloudPhase((p) => (p === "saved" ? "idle" : p));
+      }, 2000);
+    } catch (e) {
+      logFreaviaCloudError("[useMemos] force save failed", e);
+      setCloudPhase("error");
+      setCloudMessage(cloudErrorUserMessage(e, "Force save failed"));
+    }
+  }, [cloudReady, user]);
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   const activeMemo = memos.find((m) => m.id === activeMemoId) ?? memos[0];
   const activeMemoReadOnly = useMemo(
@@ -2458,6 +2505,7 @@ export function useMemos() {
       phase: cloudPhase,
       message: cloudMessage,
       remoteEnabled: Boolean(configured && user),
+      forceSave,
     },
   };
 }
