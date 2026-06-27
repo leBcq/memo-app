@@ -137,6 +137,54 @@ export function unindentNode(root: NoteNode[], nodeId: string): NoteNode[] {
   return walk(root);
 }
 
+/** Swap `nodeId` with its previous sibling (subtree moves as a whole); no-op if already first. */
+export function moveNodeUp(root: NoteNode[], nodeId: string): NoteNode[] {
+  function walk(nodes: NoteNode[]): NoteNode[] {
+    const idx = nodes.findIndex((n) => n.id === nodeId);
+    if (idx !== -1) {
+      if (idx === 0) return nodes;
+      const next = [...nodes];
+      [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+      return next;
+    }
+    let changed = false;
+    const deep = nodes.map((node) => {
+      const walkedChildren = walk(node.children);
+      if (walkedChildren !== node.children) {
+        changed = true;
+        return { ...node, children: walkedChildren };
+      }
+      return node;
+    });
+    return changed ? deep : nodes;
+  }
+  return walk(root);
+}
+
+/** Swap `nodeId` with its next sibling (subtree moves as a whole); no-op if already last. */
+export function moveNodeDown(root: NoteNode[], nodeId: string): NoteNode[] {
+  function walk(nodes: NoteNode[]): NoteNode[] {
+    const idx = nodes.findIndex((n) => n.id === nodeId);
+    if (idx !== -1) {
+      if (idx === nodes.length - 1) return nodes;
+      const next = [...nodes];
+      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+      return next;
+    }
+    let changed = false;
+    const deep = nodes.map((node) => {
+      const walkedChildren = walk(node.children);
+      if (walkedChildren !== node.children) {
+        changed = true;
+        return { ...node, children: walkedChildren };
+      }
+      return node;
+    });
+    return changed ? deep : nodes;
+  }
+  return walk(root);
+}
+
 /** Insert `newNodes` as siblings immediately after `targetId` at the same depth; `null` appends at root. */
 export function insertSiblingNodesAfter(
   root: NoteNode[],

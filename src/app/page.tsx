@@ -395,6 +395,8 @@ export default function Home() {
     deleteNodeAndFocusPrev,
     handleIndent,
     handleUnindent,
+    handleMoveUp,
+    handleMoveDown,
     handleBulkIndent,
     handleBulkUnindent,
     toggleCompleted,
@@ -1691,6 +1693,8 @@ export default function Home() {
                 onSplitNode={splitNode}
                 onIndent={handleIndent}
                 onUnindent={handleUnindent}
+                onMoveUp={handleMoveUp}
+                onMoveDown={handleMoveDown}
                 onToggleCompleted={toggleCompleted}
                 onToggleHasCheckbox={toggleHasCheckbox}
                 onToggleNote={toggleNote}

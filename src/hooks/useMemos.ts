@@ -6,6 +6,8 @@ import {
   mapTree,
   indentNode,
   unindentNode,
+  moveNodeUp,
+  moveNodeDown,
   getPrevNodeId,
   insertSiblingNodesAfter,
   flattenPreorderIds,
@@ -1531,6 +1533,16 @@ export function useMemos() {
     [updateActiveNodes],
   );
 
+  const handleMoveUp = useCallback(
+    (nodeId: string) => updateActiveNodes((nodes) => moveNodeUp(nodes, nodeId), "immediate"),
+    [updateActiveNodes],
+  );
+
+  const handleMoveDown = useCallback(
+    (nodeId: string) => updateActiveNodes((nodes) => moveNodeDown(nodes, nodeId), "immediate"),
+    [updateActiveNodes],
+  );
+
   const handleBulkIndent = useCallback(
     (nodeIds: string[]) => {
       if (nodeIds.length === 0) return;
@@ -2362,6 +2374,8 @@ export function useMemos() {
     deleteNodeAndFocusPrev,
     handleIndent,
     handleUnindent,
+    handleMoveUp,
+    handleMoveDown,
     handleBulkIndent,
     handleBulkUnindent,
     toggleCompleted,

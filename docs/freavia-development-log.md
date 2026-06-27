@@ -21,6 +21,44 @@
 
 ---
 
+### 2026-06-27 01 — ノード間の十字キー移動時のカーソル消失バグ修正 ＆ Ctrl+上下キーによるノード移動機能の追加
+
+**種別**: バグ修正 ＋ 新機能
+
+#### 修正・追加した内容
+
+| # | 内容 | 該当ファイル |
+|---|---|---|
+| 1 | ArrowUp/Down ノード間移動時のカーソル消失バグ修正 | `NoteNode.tsx` |
+| 2 | Ctrl+ArrowUp/Down によるノード（サブツリー）の兄弟間移動機能 | `NoteNode.tsx`, `useMemos.ts`, `treeUtils.ts`, `NodeList.tsx`, `page.tsx` |
+
+#### 詳細
+
+**1. カーソル消失バグの修正 (`src/components/Editor/NoteNode.tsx`)**
+
+従来の実装では、ノード間を ArrowUp/Down で移動する際に `getCaretCharOffset` で取得したオフセット値を次のノードに `setCaretToOffset` で適用していた。しかし、移動先ノードのテキストが元のオフセットより短い場合や、`contentEditable` 要素への focus が非同期的にリセットされる場合に、キャレットが消失する不具合があった。
+
+**修正内容**: オフセット保持を廃止し、以下に変更した。
+- ArrowUp（前ノードへ移動）: `setCaretToEnd(prev)` で末尾に配置
+- ArrowDown（次ノードへ移動）: `setCaretToStart(next)` で先頭に配置
+- いずれも `prev.focus()` / `next.focus()` を呼んだ後、`requestAnimationFrame` 内で再度 `focus()` とキャレット配置を行い、ブラウザの非同期フォーカス処理によるリセットを防ぐ
+
+**2. Ctrl+ArrowUp/Down によるノード移動機能の追加**
+
+- `src/lib/treeUtils.ts` に `moveNodeUp` / `moveNodeDown` を追加: 対象ノード（サブツリー全体）を同一親の前/次の兄弟と入れ替える純粋関数
+- `src/hooks/useMemos.ts` に `handleMoveUp` / `handleMoveDown` を追加: `updateActiveNodes` を通じて履歴記録付きで状態を更新
+- `src/components/Editor/NoteNode.tsx` の `handleKeyDown` に Ctrl+ArrowUp/Down ハンドラを追加: `e.preventDefault()` でスクロール防止、移動後に `requestAnimationFrame` 内でキャレット位置を維持
+- `src/components/Editor/NodeList.tsx` と `src/app/page.tsx` にプロップを配線
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → エラーなし
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-23 03 — 外部クリップボードの優先（ペースト干渉の修正）およびノードコピー条件の厳格化
 
 **種別**: バグ修正（重篤・クリップボード干渉）

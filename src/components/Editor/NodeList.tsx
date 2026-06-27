@@ -17,6 +17,8 @@ type NodeListProps = {
   onAddSibling: (id: string) => void;
   onIndent: (id: string) => void;
   onUnindent: (id: string) => void;
+  onMoveUp?: (id: string) => void;
+  onMoveDown?: (id: string) => void;
   onToggleCompleted: (id: string) => void;
   onToggleHasCheckbox: (id: string) => void;
   onToggleNote: (id: string) => void;
@@ -79,6 +81,8 @@ export default function NodeList({
   onAddSibling,
   onIndent,
   onUnindent,
+  onMoveUp,
+  onMoveDown,
   onToggleCompleted,
   onToggleHasCheckbox,
   onToggleNote,
@@ -138,6 +142,8 @@ export default function NodeList({
           onAddSibling={onAddSibling}
           onIndent={onIndent}
           onUnindent={onUnindent}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
           onToggleCompleted={onToggleCompleted}
           onToggleHasCheckbox={onToggleHasCheckbox}
           onToggleNote={onToggleNote}

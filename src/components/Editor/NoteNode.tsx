@@ -75,6 +75,9 @@ export type NoteNodeProps = {
   onAddSibling: (id: string) => void;
   onIndent: (id: string) => void;
   onUnindent: (id: string) => void;
+  /** Swap this node (with its whole subtree) with the previous/next sibling. */
+  onMoveUp?: (id: string) => void;
+  onMoveDown?: (id: string) => void;
   onToggleCompleted: (id: string) => void;
   onToggleHasCheckbox: (id: string) => void;
   onToggleNote: (id: string) => void;
@@ -265,6 +268,8 @@ export default function NoteNode({
   onAddSibling,
   onIndent,
   onUnindent,
+  onMoveUp,
+  onMoveDown,
   onToggleCompleted,
   onToggleHasCheckbox,
   onToggleNote,
@@ -542,6 +547,33 @@ export default function NoteNode({
       return;
     }
 
+    // Ctrl+ArrowUp / Ctrl+ArrowDown: swap this node (with its subtree) with the
+    // previous/next sibling, keeping focus + caret in this node's text area.
+    if (
+      (e.key === "ArrowUp" || e.key === "ArrowDown") &&
+      e.ctrlKey &&
+      !e.shiftKey &&
+      !e.metaKey &&
+      !e.altKey
+    ) {
+      const mover = e.key === "ArrowUp" ? onMoveUp : onMoveDown;
+      if (mover) {
+        e.preventDefault();
+        const caretOffset = editorRef.current ? getCaretCharOffset(editorRef.current) : 0;
+        const nodeId = node.id;
+        mover(nodeId);
+        requestAnimationFrame(() => {
+          const el = document.querySelector<HTMLElement>(
+            `[data-node-id="${nodeId}"] [data-geo-editor="body"]`,
+          );
+          if (!el) return;
+          el.focus();
+          setCaretToOffset(el, caretOffset);
+        });
+      }
+      return;
+    }
+
     // Arrow navigation: jump to previous/next node when caret is at the visual boundary.
     // Skip if any modifier that controls word/line jump is held (Ctrl on Win/Linux, Meta on Mac).
     if (
@@ -560,13 +592,21 @@ export default function NoteNode({
       const idx = all.indexOf(el);
       if (idx === -1) return;
 
+      // Land precisely at end-of-text (moving up) / start-of-text (moving down) rather than
+      // trying to preserve the caret's column offset — preserving offset was the source of the
+      // caret-disappearing bug whenever the target node's text was shorter than the offset, or
+      // the focused element wasn't actually the contentEditable body. Re-applying the caret on
+      // the next frame guards against the browser resetting selection on its own focus handling.
       if (e.key === "ArrowUp" && isCaretOnFirstLine(el)) {
         const prev = all[idx - 1];
         if (prev) {
           e.preventDefault();
-          const offset = getCaretCharOffset(el);
           prev.focus();
-          setCaretToOffset(prev, offset);
+          setCaretToEnd(prev);
+          requestAnimationFrame(() => {
+            prev.focus();
+            setCaretToEnd(prev);
+          });
         }
         return;
       }
@@ -574,9 +614,12 @@ export default function NoteNode({
         const next = all[idx + 1];
         if (next) {
           e.preventDefault();
-          const offset = getCaretCharOffset(el);
           next.focus();
-          setCaretToOffset(next, offset);
+          setCaretToStart(next);
+          requestAnimationFrame(() => {
+            next.focus();
+            setCaretToStart(next);
+          });
         }
         return;
       }
@@ -1221,6 +1264,8 @@ export default function NoteNode({
                   onAddSibling={onAddSibling}
                   onIndent={onIndent}
                   onUnindent={onUnindent}
+                  onMoveUp={onMoveUp}
+                  onMoveDown={onMoveDown}
                   onToggleCompleted={onToggleCompleted}
                   onToggleHasCheckbox={onToggleHasCheckbox}
                   onToggleNote={onToggleNote}
