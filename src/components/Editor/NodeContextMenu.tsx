@@ -58,7 +58,6 @@ type Props = {
 
 const sectionOpenState: Record<string, boolean> = {
   STRUCTURE: true,
-  TASK: false,
   NODE: false,
   TEXT: false,
   STYLE: false,
@@ -312,45 +311,45 @@ export function NodeContextMenu({
             )}
           </div>
         )}
-      </AccordionSection>
 
-      {/* ── TASK ── */}
-      <AccordionSection sectionId="TASK" label={t("ctx.task")}>
-        <div
-          className="flex cursor-pointer items-center gap-2 px-3 py-[5px] transition-colors hover:bg-zinc-900"
-          onClick={(e) => { e.stopPropagation(); onToggleHasCheckbox(); }}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggleHasCheckbox(); } }}
-          role="button" tabIndex={0}
-        >
-          <span className="w-3.5 text-center text-[11px] text-zinc-500 opacity-80">☐</span>
-          <span className="flex-1 text-[11px] tracking-wide text-zinc-200">{t("ctx.checkbox")}</span>
-          <ToggleSwitch on={node.hasCheckbox} />
-        </div>
-        <MenuItem icon={node.completed ? "↩" : "✓"} active={node.completed}
-          kbd="Ctrl+↵"
-          onClick={onToggleCompleted}>
-          {node.completed ? t("ctx.uncomplete") : t("ctx.complete")}
-        </MenuItem>
-        {node.hasCheckbox && onSetResetInterval && (
-          <div className="flex items-center gap-2 px-3 py-[5px]">
-            <span className="w-3.5 text-center text-[11px] text-zinc-500 opacity-80">🔄</span>
-            <span className="flex-1 text-[11px] tracking-wide text-zinc-200">{t("ctx.autoReset")}</span>
-            <div className="flex gap-0.5">
-              {(["none", "1hour", "1day"] as const).map((interval) => (
-                <button key={interval} type="button"
-                  onClick={() => onSetResetInterval(interval)}
-                  className={cn(
-                    "border px-1.5 py-px text-[9px] tracking-wider transition-colors",
-                    (node.resetInterval ?? "none") === interval
-                      ? "border-cyan-700 bg-cyan-950/30 text-cyan-300"
-                      : "border-zinc-700 text-zinc-500 hover:border-zinc-500 hover:text-zinc-300",
-                  )}>
-                  {interval === "none" ? t("ctx.autoResetOff") : interval === "1hour" ? t("ctx.autoReset1h") : t("ctx.autoReset1d")}
-                </button>
-              ))}
-            </div>
+        {/* ── Task items (moved from former TASK section) ── */}
+        <div className="border-t border-zinc-800/50 pt-0.5">
+          <div
+            className="flex cursor-pointer items-center gap-2 px-3 py-[5px] transition-colors hover:bg-zinc-900"
+            onClick={(e) => { e.stopPropagation(); onToggleHasCheckbox(); }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggleHasCheckbox(); } }}
+            role="button" tabIndex={0}
+          >
+            <span className="w-3.5 text-center text-[11px] text-zinc-500 opacity-80">☐</span>
+            <span className="flex-1 text-[11px] tracking-wide text-zinc-200">{t("ctx.checkbox")}</span>
+            <ToggleSwitch on={node.hasCheckbox} />
           </div>
-        )}
+          <MenuItem icon={node.completed ? "↩" : "✓"} active={node.completed}
+            kbd="Ctrl+↵"
+            onClick={onToggleCompleted}>
+            {node.completed ? t("ctx.uncomplete") : t("ctx.complete")}
+          </MenuItem>
+          {node.hasCheckbox && onSetResetInterval && (
+            <div className="flex items-center gap-2 px-3 py-[5px]">
+              <span className="w-3.5 text-center text-[11px] text-zinc-500 opacity-80">🔄</span>
+              <span className="flex-1 text-[11px] tracking-wide text-zinc-200">{t("ctx.autoReset")}</span>
+              <div className="flex gap-0.5">
+                {(["none", "1hour", "1day"] as const).map((interval) => (
+                  <button key={interval} type="button"
+                    onClick={() => onSetResetInterval(interval)}
+                    className={cn(
+                      "border px-1.5 py-px text-[9px] tracking-wider transition-colors",
+                      (node.resetInterval ?? "none") === interval
+                        ? "border-cyan-700 bg-cyan-950/30 text-cyan-300"
+                        : "border-zinc-700 text-zinc-500 hover:border-zinc-500 hover:text-zinc-300",
+                    )}>
+                    {interval === "none" ? t("ctx.autoResetOff") : interval === "1hour" ? t("ctx.autoReset1h") : t("ctx.autoReset1d")}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </AccordionSection>
 
       {/* ── NODE ── */}

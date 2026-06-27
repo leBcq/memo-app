@@ -21,6 +21,28 @@
 
 ---
 
+### 2026-06-27 09 — コンテキストメニューの「タスク」タブを廃止し、内部の機能を「構成」タブへ統合してUIをクリーンアップ
+
+**種別**: UIリファクタリング
+
+#### 変更内容 (`src/components/Editor/NodeContextMenu.tsx`)
+
+- **TASK AccordionSection を完全削除** — 「タスク」アコーディオンセクションのラッパー・見出し・開閉ロジックをすべて除去。`sectionOpenState` の `TASK: false` エントリも削除。
+
+- **タスク系3要素を STRUCTURE セクション末尾へ移動** — コピペ行の直下に `border-t border-zinc-800/50` のディバイダを設けた `<div>` ブロックを追加し、その内部に以下を配置:
+  1. チェックボックス トグルスイッチ行（`☐` アイコン + `ToggleSwitch`）
+  2. 完了/未完了 `MenuItem`（`Ctrl+↵` ショートカット表示付き）
+  3. 自動リセット（なし / 1h / 1d）の選択ボタン行（`node.hasCheckbox && onSetResetInterval` のとき表示）
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → エラーなし
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-27 08 — Ctrl複数選択時の機能一括適用（チェックボックス・完了状態・メニューからのインデント等を全選択ノードに反映）
 
 **種別**: 機能拡張
