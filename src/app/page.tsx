@@ -387,6 +387,7 @@ export default function Home() {
     setNodeImageUrl,
     toggleCollapsed,
     addChild,
+    addFirstChild,
     addSibling,
     splitNode,
     insertSiblingWithPlainTextAfter,
@@ -1754,6 +1755,7 @@ export default function Home() {
                 onToggleCollapsed={toggleCollapsed}
                 onAddChild={addChild}
                 onAddSibling={addSibling}
+                onAddFirstChild={addFirstChild}
                 onSplitNode={splitNode}
                 onIndent={handleIndentBulkAware}
                 onUnindent={handleUnindentBulkAware}

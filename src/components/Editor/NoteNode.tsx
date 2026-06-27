@@ -73,6 +73,8 @@ export type NoteNodeProps = {
   onToggleCollapsed: (id: string) => void;
   onAddChild: (id: string) => void;
   onAddSibling: (id: string) => void;
+  /** Add a new first child, expand the parent, and focus the new node. Used when Enter is pressed on a collapsed parent. */
+  onAddFirstChild?: (id: string) => void;
   onIndent: (id: string) => void;
   onUnindent: (id: string) => void;
   /** Swap this node (with its whole subtree) with the previous/next sibling. */
@@ -266,6 +268,7 @@ export default function NoteNode({
   onToggleCollapsed,
   onAddChild,
   onAddSibling,
+  onAddFirstChild,
   onIndent,
   onUnindent,
   onMoveUp,
@@ -521,6 +524,13 @@ export default function NoteNode({
     }
     if (matchesKeybind(e, KEYBINDS.ADD_SIBLING)) {
       e.preventDefault();
+
+      // Collapsed parent with children: add a first child inside and expand.
+      if (node.children.length > 0 && node.collapsed && onAddFirstChild) {
+        onAddFirstChild(node.id);
+        return;
+      }
+
       const el = editorRef.current;
       const sel = window.getSelection();
       if (!el || !sel || sel.rangeCount === 0 || !onSplitNode) {
@@ -1270,6 +1280,7 @@ export default function NoteNode({
                   onToggleCollapsed={onToggleCollapsed}
                   onAddChild={onAddChild}
                   onAddSibling={onAddSibling}
+                  onAddFirstChild={onAddFirstChild}
                   onIndent={onIndent}
                   onUnindent={onUnindent}
                   onMoveUp={onMoveUp}

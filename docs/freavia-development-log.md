@@ -21,6 +21,75 @@
 
 ---
 
+### 2026-06-28 12 — 子ノードを持つ親ノードでのEnterキー挙動の修正（展開時は同階層に兄弟ノードを生成、折りたたみ時は内部に最初の子ノードを生成するロジックの実装）
+
+**種別**: バグ修正
+
+#### 問題
+
+子ノードを持つ親ノードが「折りたたみ（collapsed）状態」でEnterキーを押すと、常に同階層の次の兄弟として新ノードが生成されていた。仕様では、折りたたみ状態の場合は内部の最初の子ノードとして生成すべき。
+
+#### 修正内容
+
+**`src/hooks/useMemos.ts`** — `addFirstChild` 関数を追加
+
+```typescript
+const addFirstChild = useCallback(
+  (nodeId: string) => {
+    const newNode = createNode();
+    updateActiveNodes(
+      (nodes) => mapTree(nodes, (n) =>
+        n.id === nodeId
+          ? { ...n, collapsed: false, children: [newNode, ...n.children] }
+          : n,
+      ), "immediate",
+    );
+    focusNodeAfterCommit(newNode.id);
+  },
+  [updateActiveNodes, focusNodeAfterCommit],
+);
+```
+
+- 新ノードを `children` 配列の先頭（index 0）に挿入
+- 同時に `collapsed: false` へ切り替えることでフォーカスが可視状態の要素に当たることを保証
+
+**`src/components/Editor/NoteNode.tsx`** — Enter ハンドラに collapsed チェックを追加
+
+```typescript
+if (matchesKeybind(e, KEYBINDS.ADD_SIBLING)) {
+  e.preventDefault();
+
+  // 折りたたみ状態の親ノード → 最初の子として追加
+  if (node.children.length > 0 && node.collapsed && onAddFirstChild) {
+    onAddFirstChild(node.id);
+    return;
+  }
+
+  // 通常の兄弟追加 / 分割（既存ロジック）
+  ...
+}
+```
+
+**`src/components/Editor/NodeList.tsx`** — `onAddFirstChild?` prop を追加・転送
+
+**`src/app/page.tsx`** — `addFirstChild` を `useMemos()` から destructure して `NodeList` へ渡す
+
+#### 動作仕様
+
+| ノードの状態 | Enterキーの挙動 |
+|---|---|
+| 展開中（または子なし） | 次の兄弟ノードを生成（従来通り） |
+| 折りたたみ中（子あり） | 親を展開 + 最初の子ノードを生成 + フォーカス移動 |
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → エラーなし
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-27 11 — UIポリッシュ：折りたたみボタンおよびトグルスイッチに、ホバー時のハイライトやクリック時の沈み込みアニメーション（マイクロインタラクション）を追加
 
 **種別**: UIポリッシュ

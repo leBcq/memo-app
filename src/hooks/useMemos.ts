@@ -1473,6 +1473,24 @@ export function useMemos() {
     [updateActiveNodes],
   );
 
+  /** Prepend a new child as the first child, then expand the parent and focus the new node. */
+  const addFirstChild = useCallback(
+    (nodeId: string) => {
+      const newNode = createNode();
+      updateActiveNodes(
+        (nodes) =>
+          mapTree(nodes, (n) =>
+            n.id === nodeId
+              ? { ...n, collapsed: false, children: [newNode, ...n.children] }
+              : n,
+          ),
+        "immediate",
+      );
+      focusNodeAfterCommit(newNode.id);
+    },
+    [updateActiveNodes, focusNodeAfterCommit],
+  );
+
   const addSibling = useCallback(
     (nodeId: string) => {
       const newNode = createNode();
@@ -2448,6 +2466,7 @@ export function useMemos() {
     setNodeContent,
     toggleCollapsed,
     addChild,
+    addFirstChild,
     addSibling,
     splitNode,
     insertSiblingWithPlainTextAfter,

@@ -15,6 +15,7 @@ type NodeListProps = {
   onToggleCollapsed: (id: string) => void;
   onAddChild: (id: string) => void;
   onAddSibling: (id: string) => void;
+  onAddFirstChild?: (id: string) => void;
   onIndent: (id: string) => void;
   onUnindent: (id: string) => void;
   onMoveUp?: (id: string) => void;
@@ -79,6 +80,7 @@ export default function NodeList({
   onToggleCollapsed,
   onAddChild,
   onAddSibling,
+  onAddFirstChild,
   onIndent,
   onUnindent,
   onMoveUp,
@@ -140,6 +142,7 @@ export default function NodeList({
           onToggleCollapsed={onToggleCollapsed}
           onAddChild={onAddChild}
           onAddSibling={onAddSibling}
+          onAddFirstChild={onAddFirstChild}
           onIndent={onIndent}
           onUnindent={onUnindent}
           onMoveUp={onMoveUp}
