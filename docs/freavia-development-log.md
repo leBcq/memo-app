@@ -21,6 +21,46 @@
 
 ---
 
+### 2026-06-27 03 — ログイン前デフォルト画面のリファクタリング（個人メモの露出を排除し、ミニマルなウェルカムUIへ変更）
+
+**種別**: バグ修正 ＋ UI改善
+
+#### 原因
+
+`page.tsx` の auth ゲート条件が `authConfigured && !authLoading && !user` だったため、Supabase がセッション確認中（`authLoading=true`）の間は条件が false になり、フルエディタが DEFAULT_MEMOS（"Track Memo", "Game Dev", "Ideas"）と共に一瞬描画されていた。
+
+#### 修正内容
+
+**`src/app/page.tsx`**
+
+```typescript
+// 変更前
+if (authConfigured && !authLoading && !user) {
+  return <WelcomeScreen onSignIn={signInWithGoogle} />;
+}
+
+// 変更後 — authLoading 中も WelcomeScreen を表示し、DEFAULT_MEMOS のフラッシュを防ぐ
+if (authConfigured && (authLoading || !user)) {
+  return <WelcomeScreen onSignIn={signInWithGoogle} isLoading={authLoading} />;
+}
+```
+
+**`src/components/WelcomeScreen.tsx`**
+
+- `isLoading` prop を追加: セッション確認中はサインインボタンを隠し、`AUTHENTICATING` の小さなパルスインジケーターを表示（ユーザーが誤ってボタンを押すことを防ぐ）
+- エディタ本体のアンビエント感と統一するグリッドテクスチャをオーバーレイとして追加
+- 左上・右下の幾何学デコレーション（ロータス菱形）追加
+- `active:scale-[0.98]` でサインインボタンに控えめなフィードバック追加
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → エラーなし
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-27 02 — 折りたたみノード配下の子孫をキーボード移動対象からスキップする修正（カーソル消失バグの完全解決）
 
 **種別**: バグ修正（根本原因）

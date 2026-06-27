@@ -1297,11 +1297,12 @@ export default function Home() {
     };
   }, [selectedIds, activeId, displayNodes, storeSelectedToClipboard, clearNodeClipboard, deleteSelectedNodes, pasteNodesAfter]);
 
-  // Auth gate: when Supabase auth is configured and the user isn't signed in, show the
-  // welcome screen instead of the editor — never render memo content pre-login. Local-only
-  // mode (no Supabase env configured) has no login concept, so it skips this gate entirely.
-  if (authConfigured && !authLoading && !user) {
-    return <WelcomeScreen onSignIn={signInWithGoogle} />;
+  // Auth gate: show WelcomeScreen whenever auth is configured and the user is not yet
+  // confirmed as signed in — this covers BOTH the loading phase (prevents flashing
+  // DEFAULT_MEMOS during the session check) and the post-load unauthenticated state.
+  // Local-only mode (!authConfigured) has no login concept and skips this gate.
+  if (authConfigured && (authLoading || !user)) {
+    return <WelcomeScreen onSignIn={signInWithGoogle} isLoading={authLoading} />;
   }
 
   return (
