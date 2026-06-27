@@ -1328,7 +1328,6 @@ export default function Home() {
       )}
       <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:28px_28px]" />
       <div className="pointer-events-none fixed -left-8 top-12 h-40 w-40 rotate-45 border border-cyan-400/30" />
-      <div className="pointer-events-none fixed bottom-10 right-12 h-48 w-48 border border-zinc-700/70 opacity-[0.15] transition-opacity duration-300 group-hover/app:opacity-40" />
 
       <Toolbar
         isEditorActive={Boolean(activeId)}

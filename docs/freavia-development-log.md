@@ -21,6 +21,46 @@
 
 ---
 
+### 2026-06-27 04 — 右下の不要なボックスUIの削除、およびチェックボックスのチェック状態とテキスト完了スタイル（取り消し線）の連動を解除
+
+**種別**: UI削除 ＋ 挙動修正
+
+#### 1. 右下ボックスUIの削除 (`src/app/page.tsx`)
+
+エディタ画面右下に `fixed bottom-10 right-12` で配置されていた装飾ボックスを削除。
+
+```jsx
+// 削除
+<div className="pointer-events-none fixed bottom-10 right-12 h-48 w-48 border border-zinc-700/70 opacity-[0.15] transition-opacity duration-300 group-hover/app:opacity-40" />
+```
+
+#### 2. チェックボックス状態とテキスト完了スタイルの分離 (`src/components/Editor/NoteNode.tsx`)
+
+**変更前の挙動**: `node.completed` が true になると `hasCheckbox` の有無に関わらず、テキストに `line-through` クラスとグレーアウトカラー（`EDITOR_COMPLETED_TEXT_COLOR`）が適用されていた。
+
+**修正後の挙動**:
+- `hasCheckbox=true` のノードでチェックを入れても、テキストは通常表示のまま（色・装飾なし）
+- `hasCheckbox=false` の standalone completed（コンテキストメニュー等での完了マーク）は従来通り取り消し線 + グレーアウト
+
+```typescript
+// editorBodyClassNames
+if (completed && !hasCheckbox) return "line-through";  // checkbox時は適用しない
+
+// editorBodyColorStyle
+if (node.completed && !node.hasCheckbox) {             // checkbox時は適用しない
+  return { color: EDITOR_COMPLETED_TEXT_COLOR, ... };
+}
+```
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → エラーなし
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-27 03 — ログイン前デフォルト画面のリファクタリング（個人メモの露出を排除し、ミニマルなウェルカムUIへ変更）
 
 **種別**: バグ修正 ＋ UI改善
