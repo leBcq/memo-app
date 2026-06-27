@@ -989,7 +989,7 @@ export default function NoteNode({
                 <GlossaryOverlay
                   html={node.content}
                   className={cn(
-                    "absolute inset-0 min-h-[22px] whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent leading-relaxed",
+                    "absolute inset-0 min-h-[22px] whitespace-pre-wrap break-all [overflow-wrap:anywhere] bg-transparent leading-relaxed",
                     editorBodyClassNames(node),
                   )}
                   style={editorBodyColorStyle(node)}
@@ -1005,7 +1005,7 @@ export default function NoteNode({
                 data-node-id={node.id}
                 data-geo-editor="body"
                 className={cn(
-                  "min-h-[22px] w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent leading-relaxed outline-none",
+                  "min-h-[22px] w-full whitespace-pre-wrap break-all [overflow-wrap:anywhere] bg-transparent leading-relaxed outline-none",
                   editorBodyClassNames(node),
                   isSelectionMode && mobileTapToggleOverlay && "pointer-events-none touch-none select-none",
                 )}

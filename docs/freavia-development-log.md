@@ -21,6 +21,39 @@
 
 ---
 
+### 2026-06-27 07 — 連続した半角英数字が画面外にはみ出すバグを修正（テキストの自動折り返し処理の追加）
+
+**種別**: レイアウトバグ修正
+
+#### 原因
+
+`NoteNode.tsx` の contentEditable 要素と Glossary オーバーレイに `break-words [overflow-wrap:anywhere]` が設定されていたが、Tailwind v4 の CSS 生成順序によっては `break-words`（`overflow-wrap: break-word`）が `[overflow-wrap:anywhere]`（`overflow-wrap: anywhere`）を上書きしてしまうケースがあった。さらに `word-break` プロパティが未設定のため、スペースなしの連続した半角文字列（URL など）でブラウザが折り返し機会を見つけられずはみ出していた。
+
+#### 修正内容 (`src/components/Editor/NoteNode.tsx`)
+
+**contentEditable 本体と Glossary オーバーレイの両方で**:
+
+```
+// 変更前
+whitespace-pre-wrap break-words [overflow-wrap:anywhere]
+
+// 変更後
+whitespace-pre-wrap break-all [overflow-wrap:anywhere]
+```
+
+- `break-words` を除去 — `overflow-wrap: break-word` と `overflow-wrap: anywhere` の同一プロパティ競合を解消
+- `break-all` を追加 — `word-break: break-all` を明示し、スペースがない連続文字列でも任意の文字間で折り返しを許可
+- `[overflow-wrap:anywhere]` は維持 — min-content 幅の計算にも折り返し機会を反映させる
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → エラーなし
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-27 06 — チェックボックスの表示/非表示切り替え時に、ノードの完了状態（completed）が意図せずリセットされるバグを修正
 
 **種別**: バグ修正（1行）
