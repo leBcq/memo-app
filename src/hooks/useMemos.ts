@@ -1705,7 +1705,7 @@ export function useMemos() {
         (nodes) =>
           mapTree(nodes, (n) => {
             if (n.id !== nodeId) return n;
-            return { ...n, hasCheckbox: !n.hasCheckbox, completed: n.hasCheckbox ? false : n.completed };
+            return { ...n, hasCheckbox: !n.hasCheckbox };
           }),
         "immediate",
       ),

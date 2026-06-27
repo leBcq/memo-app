@@ -21,6 +21,37 @@
 
 ---
 
+### 2026-06-27 06 — チェックボックスの表示/非表示切り替え時に、ノードの完了状態（completed）が意図せずリセットされるバグを修正
+
+**種別**: バグ修正（1行）
+
+#### 原因
+
+`src/hooks/useMemos.ts` の `toggleHasCheckbox` 内のマッパー:
+
+```typescript
+// 変更前 — hasCheckbox を false にする際に completed も false にリセットしていた
+return { ...n, hasCheckbox: !n.hasCheckbox, completed: n.hasCheckbox ? false : n.completed };
+```
+
+`n.hasCheckbox ? false : n.completed` という式は「チェックボックスがあった（true）なら completed を false に」という意味になり、チェックボックスを**外す操作**（true → false）で `completed` が意図せずリセットされていた。
+
+#### 修正
+
+```typescript
+// 変更後 — hasCheckbox のみを変更し、completed は一切触らない
+return { ...n, hasCheckbox: !n.hasCheckbox };
+```
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → エラーなし
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-27 05 — 完了状態の仕様変更（チェックボックスとの連動復旧 ＆ Ctrl+Enterでの単独完了トグル機能の追加）
 
 **種別**: 仕様修正 ＋ 新機能
