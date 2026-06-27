@@ -33,10 +33,8 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { uploadFreaviaImageToStorage } from "@/lib/freaviaImageUpload";
 
 function editorBodyClassNames(node: NoteNodeType): string {
-  const { completed, hasCheckbox, headingLevel } = node;
-  // Apply line-through only when completed via the standalone "completed" feature,
-  // not when the node uses a checkbox — checkbox users want the text readable after checking.
-  if (completed && !hasCheckbox) return "line-through";
+  const { completed, headingLevel } = node;
+  if (completed) return "line-through";
   if (headingLevel === "h1") return "text-lg font-medium";
   if (headingLevel === "h2") return "text-base font-medium";
   if (headingLevel === "h3") return "text-[13px] font-medium";
@@ -44,8 +42,7 @@ function editorBodyClassNames(node: NoteNodeType): string {
 }
 
 function editorBodyColorStyle(node: NoteNodeType): CSSProperties | undefined {
-  // Same logic: grayed-out text only for non-checkbox completed nodes.
-  if (node.completed && !node.hasCheckbox) {
+  if (node.completed) {
     return { color: EDITOR_COMPLETED_TEXT_COLOR, caretColor: EDITOR_COMPLETED_CARET_COLOR };
   }
   return { color: EDITOR_STANDARD_TEXT_COLOR, caretColor: EDITOR_STANDARD_CARET_COLOR };
@@ -547,6 +544,13 @@ export default function NoteNode({
       const tempDiv = document.createElement("div");
       tempDiv.appendChild(afterFragment);
       onSplitNode(node.id, el.innerHTML, tempDiv.innerHTML);
+      return;
+    }
+
+    // Ctrl+Enter / Cmd+Enter: toggle completed on any node (with or without checkbox).
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      onToggleCompleted(node.id);
       return;
     }
 

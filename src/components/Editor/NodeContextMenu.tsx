@@ -326,8 +326,9 @@ export function NodeContextMenu({
           <span className="flex-1 text-[11px] tracking-wide text-zinc-200">{t("ctx.checkbox")}</span>
           <ToggleSwitch on={node.hasCheckbox} />
         </div>
-        <MenuItem icon={node.completed ? "↩" : "✓"} active={node.completed} disabled={!node.hasCheckbox}
-          onClick={() => { if (node.hasCheckbox) onToggleCompleted(); }}>
+        <MenuItem icon={node.completed ? "↩" : "✓"} active={node.completed}
+          kbd="Ctrl+↵"
+          onClick={onToggleCompleted}>
           {node.completed ? t("ctx.uncomplete") : t("ctx.complete")}
         </MenuItem>
         {node.hasCheckbox && onSetResetInterval && (

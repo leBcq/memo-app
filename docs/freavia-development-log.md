@@ -21,6 +21,55 @@
 
 ---
 
+### 2026-06-27 05 — 完了状態の仕様変更（チェックボックスとの連動復旧 ＆ Ctrl+Enterでの単独完了トグル機能の追加）
+
+**種別**: 仕様修正 ＋ 新機能
+
+#### 変更内容
+
+**`src/components/Editor/NoteNode.tsx`**
+
+1. **スタイル関数をリバート**: 前回変更した `editorBodyClassNames` / `editorBodyColorStyle` の `!hasCheckbox` 条件を削除し、`completed=true` であれば `hasCheckbox` の有無に関わらず取り消し線＋グレーアウトを適用する元の仕様に戻した。
+
+2. **Ctrl+Enter / Cmd+Enter ショートカット追加**: ノードにフォーカスがある状態で Ctrl+Enter（Mac は Cmd+Enter）を押すと、チェックボックスの有無に関わらず `onToggleCompleted` を呼び出して `completed` 状態をトグルする。`ADD_SIBLING`（修飾キーなし Enter）と衝突しないよう `e.ctrlKey || e.metaKey` で明示的に分岐。
+
+```typescript
+if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+  e.preventDefault();
+  onToggleCompleted(node.id);
+  return;
+}
+```
+
+**`src/components/Editor/NodeContextMenu.tsx`**
+
+3. **TASK セクションの完了トグル項目を常時有効化**: `disabled={!node.hasCheckbox}` 条件と `if (node.hasCheckbox)` ガードを削除し、チェックボックスなしノードでも直接 `onToggleCompleted()` を呼び出せるようにした。ショートカットヒント `Ctrl+↵` を表示するよう `kbd` prop も追加。
+
+```jsx
+// 変更前: disabled={!node.hasCheckbox} + onClick={() => { if (node.hasCheckbox) onToggleCompleted(); }}
+// 変更後:
+<MenuItem icon={node.completed ? "↩" : "✓"} active={node.completed}
+  kbd="Ctrl+↵"
+  onClick={onToggleCompleted}>
+```
+
+#### 挙動まとめ
+
+| 操作 | hasCheckbox=true | hasCheckbox=false |
+|---|---|---|
+| チェックをクリック | completed トグル → 取り消し線 on/off | — |
+| Ctrl+Enter | completed トグル → 取り消し線 on/off | completed トグル → 取り消し線 on/off |
+| コンテキストメニュー → 完了/未完了 | completed トグル → 取り消し線 on/off | completed トグル → 取り消し線 on/off |
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → エラーなし
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-27 04 — 右下の不要なボックスUIの削除、およびチェックボックスのチェック状態とテキスト完了スタイル（取り消し線）の連動を解除
 
 **種別**: UI削除 ＋ 挙動修正
