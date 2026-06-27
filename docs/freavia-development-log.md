@@ -21,6 +21,58 @@
 
 ---
 
+### 2026-06-27 02 — 折りたたみノード配下の子孫をキーボード移動対象からスキップする修正（カーソル消失バグの完全解決）
+
+**種別**: バグ修正（根本原因）
+
+#### 原因
+
+ArrowUp / ArrowDown によるノード間フォーカス移動は、`querySelectorAll('[data-geo-editor="body"]')` で DOM 上のすべての `contentEditable` 要素を収集し、インデックスで前後を決定していた。しかし、折りたたまれた親ノードの子孫は CSS の `grid-rows-[0fr]` + `overflow-hidden` により画面上は非表示だが **DOM には存在し続ける** ため、クエリで拾われてしまいフォーカスが当たるとカーソルが消えて見えなくなっていた。
+
+#### 修正内容（`src/components/Editor/NoteNode.tsx`）
+
+**① 子孫ラッパーへの識別属性付与**
+
+折りたたみ状態のグリッドコンテナに `data-node-collapsed="true"` を付与。展開時は属性なし（`undefined`）でクリーンを保つ。
+
+```jsx
+// 変更前
+<div className={cn("grid ...", node.collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}>
+
+// 変更後
+<div
+  className={cn("grid ...", node.collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}
+  data-node-collapsed={node.collapsed ? "true" : undefined}
+>
+```
+
+**② キーボードハンドラのフィルタリング**
+
+`querySelectorAll` 結果を `.closest('[data-node-collapsed="true"]')` でフィルタし、折りたたまれた祖先の内側にある要素をすべてスキップ。
+
+```typescript
+// 変更前
+const all = Array.from(
+  scope.querySelectorAll<HTMLElement>('[data-geo-editor="body"]:not([contenteditable="false"])'),
+);
+
+// 変更後
+const all = Array.from(
+  scope.querySelectorAll<HTMLElement>('[data-geo-editor="body"]:not([contenteditable="false"])'),
+).filter((e) => !e.closest('[data-node-collapsed="true"]'));
+```
+
+これにより、キーボード移動の候補リストは「画面上で実際に表示されているノード」のみになる。
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → エラーなし
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-27 01 — ノード間の十字キー移動時のカーソル消失バグ修正 ＆ Ctrl+上下キーによるノード移動機能の追加
 
 **種別**: バグ修正 ＋ 新機能

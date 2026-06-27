@@ -588,7 +588,7 @@ export default function NoteNode({
       const scope = el.closest("[data-geo-editor-root]") ?? document;
       const all = Array.from(
         scope.querySelectorAll<HTMLElement>('[data-geo-editor="body"]:not([contenteditable="false"])'),
-      );
+      ).filter((e) => !e.closest('[data-node-collapsed="true"]'));
       const idx = all.indexOf(el);
       if (idx === -1) return;
 
@@ -1250,6 +1250,7 @@ export default function NoteNode({
               "grid transition-[grid-template-rows] duration-200 ease-out",
               node.collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]",
             )}
+            data-node-collapsed={node.collapsed ? "true" : undefined}
           >
             <div className="overflow-hidden">
               {node.children.map((child) => (
