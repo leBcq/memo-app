@@ -1596,6 +1596,26 @@ export function useMemos() {
     [updateActiveNodes],
   );
 
+  const toggleCompletedBatch = useCallback(
+    (nodeIds: string[]) => {
+      if (nodeIds.length === 0) return;
+      const set = new Set(nodeIds);
+      updateActiveNodes((nodes) => {
+        const collected: NoteNode[] = [];
+        mapTree(nodes, (n) => { if (set.has(n.id)) collected.push(n); return n; });
+        const allCompleted = collected.length > 0 && collected.every((n) => n.completed);
+        const nextCompleted = !allCompleted;
+        const now = new Date().toISOString();
+        return mapTree(nodes, (n) =>
+          set.has(n.id)
+            ? { ...n, completed: nextCompleted, checkedAt: nextCompleted ? now : null }
+            : n,
+        );
+      }, "immediate");
+    },
+    [updateActiveNodes],
+  );
+
   const setResetInterval = useCallback(
     (nodeId: string, interval: ResetInterval) =>
       updateActiveNodes(
@@ -1709,6 +1729,21 @@ export function useMemos() {
           }),
         "immediate",
       ),
+    [updateActiveNodes],
+  );
+
+  const toggleHasCheckboxBatch = useCallback(
+    (nodeIds: string[]) => {
+      if (nodeIds.length === 0) return;
+      const set = new Set(nodeIds);
+      updateActiveNodes((nodes) => {
+        const collected: NoteNode[] = [];
+        mapTree(nodes, (n) => { if (set.has(n.id)) collected.push(n); return n; });
+        const allHave = collected.length > 0 && collected.every((n) => n.hasCheckbox);
+        const target = !allHave;
+        return mapTree(nodes, (n) => set.has(n.id) ? { ...n, hasCheckbox: target } : n);
+      }, "immediate");
+    },
     [updateActiveNodes],
   );
 
@@ -2379,8 +2414,10 @@ export function useMemos() {
     handleBulkIndent,
     handleBulkUnindent,
     toggleCompleted,
+    toggleCompletedBatch,
     setResetInterval,
     toggleHasCheckbox,
+    toggleHasCheckboxBatch,
     setNote,
     toggleNote,
     setNodeBgColor,

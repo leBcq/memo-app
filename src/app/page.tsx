@@ -400,7 +400,9 @@ export default function Home() {
     handleBulkIndent,
     handleBulkUnindent,
     toggleCompleted,
+    toggleCompletedBatch,
     toggleHasCheckbox,
+    toggleHasCheckboxBatch,
     toggleNote,
     setNote,
     setNodeBgColor,
@@ -478,6 +480,50 @@ export default function Home() {
       }
     },
     [selectedIds, setNodesHeadingBatch, setNodeHeading],
+  );
+
+  const handleToggleHasCheckbox = useCallback(
+    (id: string) => {
+      if (selectedIds.length >= 2 && selectedIds.includes(id)) {
+        toggleHasCheckboxBatch(selectedIds);
+      } else {
+        toggleHasCheckbox(id);
+      }
+    },
+    [selectedIds, toggleHasCheckboxBatch, toggleHasCheckbox],
+  );
+
+  const handleToggleCompleted = useCallback(
+    (id: string) => {
+      if (selectedIds.length >= 2 && selectedIds.includes(id)) {
+        toggleCompletedBatch(selectedIds);
+      } else {
+        toggleCompleted(id);
+      }
+    },
+    [selectedIds, toggleCompletedBatch, toggleCompleted],
+  );
+
+  const handleIndentBulkAware = useCallback(
+    (id: string) => {
+      if (selectedIds.length >= 2 && selectedIds.includes(id)) {
+        handleBulkIndent(selectedIds);
+      } else {
+        handleIndent(id);
+      }
+    },
+    [selectedIds, handleBulkIndent, handleIndent],
+  );
+
+  const handleUnindentBulkAware = useCallback(
+    (id: string) => {
+      if (selectedIds.length >= 2 && selectedIds.includes(id)) {
+        handleBulkUnindent(selectedIds);
+      } else {
+        handleUnindent(id);
+      }
+    },
+    [selectedIds, handleBulkUnindent, handleUnindent],
   );
 
   const handleAddMemo = (parentId: string | null = null, kind: MemoType = "standard") => {
@@ -1036,14 +1082,20 @@ export default function Home() {
   }, [mobileOutlineActionsAnchorId, toggleCollapsed]);
 
   const mobileSheetToggleCheckbox = useCallback(() => {
-    if (!mobileOutlineActionsAnchorId) return;
-    toggleHasCheckbox(mobileOutlineActionsAnchorId);
-  }, [mobileOutlineActionsAnchorId, toggleHasCheckbox]);
+    if (selectedIds.length >= 2) {
+      toggleHasCheckboxBatch(selectedIds);
+    } else if (mobileOutlineActionsAnchorId) {
+      toggleHasCheckbox(mobileOutlineActionsAnchorId);
+    }
+  }, [selectedIds, mobileOutlineActionsAnchorId, toggleHasCheckboxBatch, toggleHasCheckbox]);
 
   const mobileSheetToggleCompleted = useCallback(() => {
-    if (!mobileOutlineActionsAnchorId) return;
-    toggleCompleted(mobileOutlineActionsAnchorId);
-  }, [mobileOutlineActionsAnchorId, toggleCompleted]);
+    if (selectedIds.length >= 2) {
+      toggleCompletedBatch(selectedIds);
+    } else if (mobileOutlineActionsAnchorId) {
+      toggleCompleted(mobileOutlineActionsAnchorId);
+    }
+  }, [selectedIds, mobileOutlineActionsAnchorId, toggleCompletedBatch, toggleCompleted]);
 
   const mobileSheetSetHeading = useCallback(
     (level: HeadingLevel) => {
@@ -1691,12 +1743,12 @@ export default function Home() {
                 onAddChild={addChild}
                 onAddSibling={addSibling}
                 onSplitNode={splitNode}
-                onIndent={handleIndent}
-                onUnindent={handleUnindent}
+                onIndent={handleIndentBulkAware}
+                onUnindent={handleUnindentBulkAware}
                 onMoveUp={handleMoveUp}
                 onMoveDown={handleMoveDown}
-                onToggleCompleted={toggleCompleted}
-                onToggleHasCheckbox={toggleHasCheckbox}
+                onToggleCompleted={handleToggleCompleted}
+                onToggleHasCheckbox={handleToggleHasCheckbox}
                 onToggleNote={toggleNote}
                 onSetNote={setNote}
                 onSetBgColor={handleSetBgColor}

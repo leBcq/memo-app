@@ -21,6 +21,48 @@
 
 ---
 
+### 2026-06-27 08 — Ctrl複数選択時の機能一括適用（チェックボックス・完了状態・メニューからのインデント等を全選択ノードに反映）
+
+**種別**: 機能拡張
+
+#### 背景
+
+複数ノード選択中（`selectedIds.length >= 2`）にコンテキストメニューやキーボードショートカットで操作を行うと、選択ノードのうち1つにしか適用されないという問題があった。色・見出しレベルはすでにバッチ対応済みだったが、チェックボックス・完了状態・インデント/アンインデントは未対応だった。
+
+#### 修正内容
+
+**`src/hooks/useMemos.ts`** — 2つのバッチ関数を追加
+
+- `toggleCompletedBatch(nodeIds: string[])` — 選択ノードの完了状態を一括トグル。全ノードが完了済みなら全解除、一部でも未完了なら全完了とする（Dynalist 方式）。
+- `toggleHasCheckboxBatch(nodeIds: string[])` — チェックボックス表示を一括トグル。全ノードが `hasCheckbox=true` なら全削除、一部でも `false` なら全追加とする。
+
+両関数とも `mapTree` を2パス走査（1回目で選択ノードのコンセンサス状態を収集し、2回目で一括適用）することでツリー整合性を維持。
+
+**`src/app/page.tsx`** — 4つのバッチ対応ラッパーハンドラを追加
+
+| ハンドラ | 複数選択時 | 単一時 |
+|---|---|---|
+| `handleToggleHasCheckbox` | `toggleHasCheckboxBatch(selectedIds)` | `toggleHasCheckbox(id)` |
+| `handleToggleCompleted` | `toggleCompletedBatch(selectedIds)` | `toggleCompleted(id)` |
+| `handleIndentBulkAware` | `handleBulkIndent(selectedIds)` | `handleIndent(id)` |
+| `handleUnindentBulkAware` | `handleBulkUnindent(selectedIds)` | `handleUnindent(id)` |
+
+条件は「`selectedIds.length >= 2` かつ `selectedIds.includes(id)`」。コンテキストメニューが選択外ノードで開かれた場合は単一操作にフォールバックする。
+
+- `NodeList` へ渡す props を4つすべてラッパーに差し替え → コンテキストメニュー・Ctrl+Enter ショートカット・Tab キーすべてが自動でバッチ動作に切り替わる
+- モバイルシートの `mobileSheetToggleCheckbox` / `mobileSheetToggleCompleted` も同様にバッチ対応化
+
+**テキストスタイル（太字・斜体）**: コンテキストメニューの `textBatchTargetIds` はすでに `selectedIds` を参照しており対応済み。今回の変更で追加作業なし。
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → エラーなし
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-27 07 — 連続した半角英数字が画面外にはみ出すバグを修正（テキストの自動折り返し処理の追加）
 
 **種別**: レイアウトバグ修正
