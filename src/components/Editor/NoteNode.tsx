@@ -781,7 +781,7 @@ export default function NoteNode({
                 type="button"
                 onClick={() => onToggleCollapsed(node.id)}
                 className={cn(
-                  "mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center border bg-zinc-900 transition-all hover:bg-zinc-800 active:scale-90",
+                  "mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center border bg-zinc-900 transition-all duration-150 ease-in-out hover:bg-zinc-800/80 active:scale-[0.82]",
                 )}
                 style={{
                   borderColor: solidAccent,
@@ -792,7 +792,7 @@ export default function NoteNode({
               >
                 <svg
                   className={cn(
-                    "h-2 w-2 shrink-0 transition-transform duration-150",
+                    "h-2 w-2 shrink-0 transition-transform duration-200 ease-in-out",
                     !node.collapsed && "rotate-90",
                   )}
                   viewBox="0 0 8 8"

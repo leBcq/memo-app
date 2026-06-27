@@ -21,6 +21,39 @@
 
 ---
 
+### 2026-06-27 11 — UIポリッシュ：折りたたみボタンおよびトグルスイッチに、ホバー時のハイライトやクリック時の沈み込みアニメーション（マイクロインタラクション）を追加
+
+**種別**: UIポリッシュ
+
+#### 変更内容
+
+**`src/components/Editor/NoteNode.tsx`** — 折りたたみボタン（▶）
+
+| 項目 | 変更前 | 変更後 |
+|------|--------|--------|
+| ボタン遷移速度 | `transition-all`（duration 未指定） | `transition-all duration-150 ease-in-out` |
+| ホバー背景 | `hover:bg-zinc-800` | `hover:bg-zinc-800/80`（少し透明度を加えて柔らかく） |
+| クリック沈み込み | `active:scale-90` | `active:scale-[0.82]`（小サイズボタンに合わせてより明確に） |
+| 矢印回転 | `transition-transform duration-150` | `transition-transform duration-200 ease-in-out`（ゆるやかな ease を追加） |
+
+**`src/components/Editor/NodeContextMenu.tsx`** — ToggleSwitch
+
+| 項目 | 変更前 | 変更後 |
+|------|--------|--------|
+| 外側コンテナ遷移 | なし | `transition-all duration-200 ease-in-out` |
+| クリック時沈み込み | なし | `group-active:scale-90`（親 div に `group` を付与してトリガー） |
+| サム（Thumb）移動 | なし（瞬間移動） | `transition-all duration-200 ease-in-out`（left 位置と背景色が滑らかにアニメーション） |
+| 親 div | `flex cursor-pointer ...` | `group flex cursor-pointer ...`（3か所すべて一括置換） |
+
+#### ビルド確認
+
+```
+npx tsc --noEmit  → エラーなし
+npm run build     → ✓ Compiled successfully
+```
+
+---
+
 ### 2026-06-27 10 — Ctrl+S (Cmd+S) による手動強制同期（セーブ）ショートカットの実装と、保存完了時の視覚的フィードバック追加
 
 **種別**: 機能追加

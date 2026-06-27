@@ -315,7 +315,7 @@ export function NodeContextMenu({
         {/* ── Task items (moved from former TASK section) ── */}
         <div className="border-t border-zinc-800/50 pt-0.5">
           <div
-            className="flex cursor-pointer items-center gap-2 px-3 py-[5px] transition-colors hover:bg-zinc-900"
+            className="group flex cursor-pointer items-center gap-2 px-3 py-[5px] transition-colors hover:bg-zinc-900"
             onClick={(e) => { e.stopPropagation(); onToggleHasCheckbox(); }}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggleHasCheckbox(); } }}
             role="button" tabIndex={0}
@@ -357,7 +357,7 @@ export function NodeContextMenu({
         <MenuItem icon="＋" onClick={onAddChild}>{t("ctx.addChild")}</MenuItem>
         <MenuItem icon="＋" onClick={onAddSibling}>{t("ctx.addSibling")}</MenuItem>
         <div
-          className="flex cursor-pointer items-center gap-2 px-3 py-[5px] transition-colors hover:bg-zinc-900"
+          className="group flex cursor-pointer items-center gap-2 px-3 py-[5px] transition-colors hover:bg-zinc-900"
           onClick={(e) => { e.stopPropagation(); onToggleNote(); }}
           role="button" tabIndex={0}
         >
@@ -389,7 +389,7 @@ export function NodeContextMenu({
         )}
         {/* Glossary overlay global toggle */}
         <div
-          className="flex cursor-pointer items-center gap-2 px-3 py-[5px] transition-colors hover:bg-zinc-900"
+          className="group flex cursor-pointer items-center gap-2 px-3 py-[5px] transition-colors hover:bg-zinc-900"
           onClick={(e) => { e.stopPropagation(); toggleGlossary(); }}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleGlossary(); } }}
           role="button"
@@ -651,8 +651,14 @@ function MenuItem({ icon, kbd, active, disabled, danger, onClick, children }: Me
 
 function ToggleSwitch({ on }: { on: boolean }) {
   return (
-    <div className={cn("relative h-3 w-6 shrink-0 border", on ? "border-cyan-700 bg-cyan-950/60" : "border-zinc-700 bg-zinc-900")}>
-      <div className={cn("absolute top-px h-2 w-2", on ? "left-[calc(100%-9px)] bg-cyan-400" : "left-px bg-zinc-500")} />
+    <div className={cn(
+      "relative h-3 w-6 shrink-0 border transition-all duration-200 ease-in-out group-active:scale-90",
+      on ? "border-cyan-700 bg-cyan-950/60" : "border-zinc-700 bg-zinc-900",
+    )}>
+      <div className={cn(
+        "absolute top-px h-2 w-2 transition-all duration-200 ease-in-out",
+        on ? "left-[calc(100%-9px)] bg-cyan-400" : "left-px bg-zinc-500",
+      )} />
     </div>
   );
 }
